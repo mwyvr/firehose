@@ -1,6 +1,8 @@
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/mwyvr/kid)
+[![Test](https://github.com/mwyvr/kid/actions/workflows/test.yaml/badge.svg)](https://github.com/mwyvr/kid/actions/workflows/test.yaml)
 [![ci](https://github.com/mwyvr/firehose/actions/workflows/ci.yml/badge.svg)](https://github.com/mwyvr/firehose/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mwyvr/firehose)](https://goreportcard.com/report/github.com/mwyvr/firehose)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)![Coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
+
 
 # firehose
 
