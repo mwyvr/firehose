@@ -549,3 +549,36 @@ func TestForceIgnoresBackoffGate(t *testing.T) {
 		}
 	}
 }
+
+// TestFetchAllItemsAgedOutDoesNotStampLastSuccess pins the honest
+// LastSuccess semantics: a feed that parses fine but whose every entry
+// falls to the retention gate yields no storable items — LastFetched
+// stamps, LastSuccess does not, so quiet-feed detection sees the truth.
+func TestFetchAllItemsAgedOutDoesNotStampLastSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel>
+<title>Ancient Ministry</title>
+<item><guid>old-1</guid><title>Long ago</title><link>https://x.example/old</link>
+<pubDate>Tue, 09 Jun 2020 14:30:00 -0700</pubDate><description>ancient</description></item>
+</channel></rss>`)
+	}))
+	defer srv.Close()
+
+	h := newHarness(t, []*firehose.Feed{{ID: 1, URL: srv.URL}})
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(h.updates) != 1 {
+		t.Fatalf("want 1 update, got %d", len(h.updates))
+	}
+	upd := h.updates[0]
+	if upd.LastFetched == nil {
+		t.Error("fetch happened; LastFetched must stamp")
+	}
+	if upd.LastSuccess != nil {
+		t.Error("no storable items; LastSuccess must NOT stamp")
+	}
+	if len(h.upserts) != 0 {
+		t.Errorf("nothing should be stored, got %v", h.upserts)
+	}
+}

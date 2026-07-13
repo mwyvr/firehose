@@ -38,6 +38,7 @@ type Settings struct {
 	Typography         bool         `toml:"typography"`
 	ReadingTime        bool         `toml:"reading_time"`
 	Highlight          bool         `toml:"highlight"`       // declared-language-only; never guess
+	Dedupe             bool         `toml:"dedupe"`          // collapse the same story arriving via multiple feeds
 	Theme              string       `toml:"theme"`           // auto | light | dark (page default; toggle overrides)
 	HighlightTheme     string       `toml:"highlight_theme"` // chroma style, light mode
 	HighlightThemeDark string       `toml:"highlight_theme_dark"`
@@ -99,6 +100,7 @@ type FeedConf struct {
 	Exclude        []string     `toml:"exclude"`
 	Include        []string     `toml:"include"`
 	StripSelectors []string     `toml:"strip_selectors"`
+	DisplayWindow  Duration     `toml:"display_window"` // per-feed override; zero inherits settings
 
 	// Per-feed fetch overrides (CDN-hostile endpoints).
 	UserAgent string            `toml:"user_agent"`
@@ -156,6 +158,28 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// WindowFor resolves a feed's display window: the per-feed override when
+// set, else the global setting. Slow civic feeds get long windows without
+// bloating every section.
+func (c *Config) WindowFor(fc FeedConf) time.Duration {
+	if fc.DisplayWindow.D() > 0 {
+		return fc.DisplayWindow.D()
+	}
+	return c.Settings.DisplayWindow.D()
+}
+
+// MaxDisplayWindow is the widest window any feed uses — the single Since
+// bound for the item query; per-feed narrowing happens at render.
+func (c *Config) MaxDisplayWindow() time.Duration {
+	w := c.Settings.DisplayWindow.D()
+	for _, fc := range c.Feeds {
+		if fc.DisplayWindow.D() > w {
+			w = fc.DisplayWindow.D()
+		}
+	}
+	return w
 }
 
 // FeedConfByURL maps config feed blocks by URL
@@ -282,6 +306,14 @@ func (c *Config) Validate() error {
 	case "auto", "light", "dark":
 	default:
 		return Errorf(EINVALID, "settings.theme %q: want auto, light, or dark", c.Settings.Theme)
+	}
+
+	for _, fc := range c.Feeds {
+		if d := fc.DisplayWindow.D(); d > 0 && d > c.Settings.CacheRetention.D() {
+			return Errorf(EINVALID,
+				"feed %s: display_window %s exceeds cache_retention %s (items would be purged before they could render)",
+				fc.URL, fc.DisplayWindow.D(), c.Settings.CacheRetention.D())
+		}
 	}
 
 	seenFeed := map[string]bool{}

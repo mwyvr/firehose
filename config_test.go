@@ -198,3 +198,55 @@ categories = ["*"]
 		t.Errorf("no fonts config: want remote default, got %q", got)
 	}
 }
+
+func TestPerFeedDisplayWindow(t *testing.T) {
+	cfg, err := LoadConfig(writeConfig(t, `
+display_window = "336h"
+cache_retention = "2160h"
+
+[[output]]
+name = "all"
+file = "index.html"
+categories = ["*"]
+
+[[feed]]
+url = "https://slow.example/feed"
+categories = ["gov"]
+display_window = "1440h"
+
+[[feed]]
+url = "https://fast.example/feed"
+categories = ["tech"]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.WindowFor(cfg.Feeds[0]); got != 1440*time.Hour {
+		t.Errorf("override not resolved: %v", got)
+	}
+	if got := cfg.WindowFor(cfg.Feeds[1]); got != 336*time.Hour {
+		t.Errorf("inherit broken: %v", got)
+	}
+	if got := cfg.MaxDisplayWindow(); got != 1440*time.Hour {
+		t.Errorf("max window: %v", got)
+	}
+}
+
+func TestPerFeedWindowExceedsRetentionRejected(t *testing.T) {
+	_, err := LoadConfig(writeConfig(t, `
+cache_retention = "720h"
+
+[[output]]
+name = "all"
+file = "index.html"
+categories = ["*"]
+
+[[feed]]
+url = "https://slow.example/feed"
+categories = ["gov"]
+display_window = "1440h"
+`))
+	if ErrorCode(err) != EINVALID {
+		t.Fatalf("want EINVALID, got %v", err)
+	}
+}

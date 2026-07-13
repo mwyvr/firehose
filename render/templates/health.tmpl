@@ -24,12 +24,13 @@
 <main>
 <div class="health-scroll">
 <table class="health">
-<thead><tr><th>feed</th><th>status</th><th>fails</th><th>last fetched</th><th>last success</th><th>backoff until</th><th></th></tr></thead>
+<thead><tr><th>feed</th><th>status</th><th>items</th><th>fails</th><th>last fetched</th><th>last success</th><th>backoff until</th><th></th></tr></thead>
 <tbody>
 {{- range .Feeds}}
 <tr class="{{if .Erroring}}health--bad{{else if .Quiet}}health--quiet{{end}}">
 <td><span class="health__title">{{.Title}}</span><br><span class="health__url">{{.URL}}</span>{{if .Categories}}<br><span class="health__cats">{{.Categories}}</span>{{end}}</td>
 <td>{{if .Status}}{{.Status}}{{else}}ok{{end}}</td>
+<td title="in window / cached">{{.Shown}} / {{.Cached}}</td>
 <td>{{.FailCount}}</td>
 <td>{{template "cell" .LastFetched}}</td>
 <td>{{template "cell" .LastSuccess}}</td>

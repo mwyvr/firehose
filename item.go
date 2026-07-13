@@ -63,6 +63,12 @@ func (it *Item) HasLink() bool { return it.URL != "" }
 // ItemFilter narrows which items render into a given output. A section IS a
 // filter — this is the WTF XxxFilter idiom, and it is the whole section
 // mechanism. The ALL river is an ItemFilter with empty Categories.
+// ItemStat is the health page's view of one cached item.
+type ItemStat struct {
+	FeedID    int64
+	Published time.Time
+}
+
 type ItemFilter struct {
 	// Categories selects items in any of these categories. Empty selects all
 	// (the ALL river).
@@ -86,6 +92,11 @@ type ItemService interface {
 	// UpsertItems inserts new items and updates changed ones, keyed by
 	// (FeedID, GUID). Existing IDs are preserved so kid.ID stays stable.
 	UpsertItems(ctx context.Context, items []*Item) error
+
+	// ItemStats returns (FeedID, Published) for every cached item — enough
+	// for the health page to compute per-feed shown/cached counts without
+	// loading bodies.
+	ItemStats(ctx context.Context) ([]ItemStat, error)
 
 	// PurgeExpired deletes items older than the cache retention cutoff. Returns
 	// the number removed. (Distinct from the display window: retention keeps

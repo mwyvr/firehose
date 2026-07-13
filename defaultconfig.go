@@ -19,6 +19,7 @@ func DefaultConfig() *Config {
 			Typography:         true,
 			ReadingTime:        true,
 			Highlight:          true,
+			Dedupe:             true,
 			HighlightTheme:     "github",
 			HighlightThemeDark: "github-dark",
 		},
@@ -79,6 +80,7 @@ theme           = "auto" # auto | light | dark; the in-page toggle overrides per
 typography      = true   # normalize quotes/dashes/ellipses (never inside code)
 reading_time    = true   # show "~N min" in the item meta line
 highlight       = true   # highlight ONLY declared languages; never guess
+dedupe          = true   # collapse the same story arriving via multiple feeds (canonical-URL identity)
 highlight_theme = %q     # chroma style names (light / dark mode)
 highlight_theme_dark = %q
 # note_template = "https://example.org/notes/new?title={title}&url={url}"  # per-item "note" link
@@ -128,6 +130,7 @@ categories = ["example"]
 # exclude         = ["sponsored"]       # drop items matching these keywords
 # include         = []                  # keep only matching items
 # strip_selectors = ["div.sharedaddy"]  # remove cruft nodes post-parse
+# display_window  = "1440h"             # per-feed window (slow civic feeds); must fit cache_retention
 `,
 		compactDuration(d.Settings.DisplayWindow.D()),
 		compactDuration(d.Settings.CacheRetention.D()),

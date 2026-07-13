@@ -32,6 +32,7 @@ type itemView struct {
 	Datetime string
 	Display  string
 	Source   string
+	AlsoVia  string // dedupe: other sources carrying this exact story
 	Author   string
 	ReadMins int
 	NoteURL  string
@@ -51,10 +52,16 @@ type pageView struct {
 }
 
 func (r *Renderer) renderRiver(ctx context.Context, out *firehose.Output, nav []navLink, meta map[int64]feedMeta) error {
-	since := r.Now().Add(-r.cfg.Settings.DisplayWindow.D())
-	items, _, err := r.items.FindItems(ctx, out.Filter(since))
+	now := r.Now()
+	items, _, err := r.items.FindItems(ctx, out.Filter(now.Add(-r.cfg.MaxDisplayWindow())))
 	if err != nil {
 		return err
+	}
+	items = r.inWindow(now, items, meta)
+
+	var alsoVia map[*firehose.Item][]string
+	if r.cfg.Settings.Dedupe {
+		items, alsoVia = dedupeItems(items, meta, r.feedOrder(meta))
 	}
 
 	pv := pageView{
@@ -73,7 +80,11 @@ func (r *Renderer) renderRiver(ctx context.Context, out *firehose.Output, nav []
 
 	isAll := out.IsAll()
 	for _, it := range items {
-		pv.Items = append(pv.Items, r.itemView(it, out, meta[it.FeedID], isAll))
+		v := r.itemView(it, out, meta[it.FeedID], isAll)
+		if via := alsoVia[it]; len(via) > 0 {
+			v.AlsoVia = strings.Join(via, ", ")
+		}
+		pv.Items = append(pv.Items, v)
 	}
 
 	var buf bytes.Buffer
@@ -164,4 +175,30 @@ func anchorID(feedURL string, it *firehose.Item) string {
 	}
 	sum := sha256.Sum256([]byte(feedURL + "|" + basis))
 	return hex.EncodeToString(sum[:6])
+}
+
+// inWindow narrows the widest-window query result to each feed's own
+// display window (per-feed override, else the global setting).
+func (r *Renderer) inWindow(now time.Time, items []*firehose.Item, meta map[int64]feedMeta) []*firehose.Item {
+	kept := items[:0]
+	for _, it := range items {
+		if !it.Published.Before(now.Add(-r.cfg.WindowFor(meta[it.FeedID].conf))) {
+			kept = append(kept, it)
+		}
+	}
+	return kept
+}
+
+// feedOrder maps stored feed IDs to config order — the dedupe tiebreaker
+// ("earlier in the config wins" is the operator's preference ranking).
+func (r *Renderer) feedOrder(meta map[int64]feedMeta) map[int64]int {
+	byURL := map[string]int{}
+	for i, fc := range r.cfg.Feeds {
+		byURL[fc.URL] = i
+	}
+	order := map[int64]int{}
+	for id, fm := range meta {
+		order[id] = byURL[fm.conf.URL]
+	}
+	return order
 }

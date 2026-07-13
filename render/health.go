@@ -22,6 +22,8 @@ type healthRow struct {
 	LastFetched  timeCell
 	LastSuccess  timeCell
 	NextEarliest timeCell
+	Shown        int // items currently in this feed's display window
+	Cached       int // items in the cache (within retention)
 	Erroring     bool
 	Quiet        bool
 	Moved        bool
@@ -51,6 +53,22 @@ func (r *Renderer) renderHealth(ctx context.Context, out *firehose.Output, nav [
 	}
 
 	now := r.Now()
+	stats, err := r.items.ItemStats(ctx)
+	if err != nil {
+		return err
+	}
+	shown, cached := map[int64]int{}, map[int64]int{}
+	byID := map[int64]firehose.FeedConf{}
+	for _, f := range stored {
+		byID[f.ID] = r.cfg.FeedConfByURL()[f.URL]
+	}
+	for _, st := range stats {
+		cached[st.FeedID]++
+		if !st.Published.Before(now.Add(-r.cfg.WindowFor(byID[st.FeedID]))) {
+			shown[st.FeedID]++
+		}
+	}
+
 	hv := healthView{SiteTitle: siteTitle, ThemeAttr: r.themeAttr(), Version: firehose.Version, Nav: nav}
 	for _, f := range stored {
 		row := healthRow{
@@ -62,6 +80,8 @@ func (r *Renderer) renderHealth(ctx context.Context, out *firehose.Output, nav [
 			LastFetched:  cellMaybe(f.LastFetched, r.cfg.Location),
 			LastSuccess:  cellMaybe(f.LastSuccess, r.cfg.Location),
 			NextEarliest: cellMaybe(f.NextEarliest, r.cfg.Location),
+			Shown:        shown[f.ID],
+			Cached:       cached[f.ID],
 			Erroring:     f.LastStatus != "",
 			Moved:        !configured[f.URL], // stored URL diverged via 301
 		}

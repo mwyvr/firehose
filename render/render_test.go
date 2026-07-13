@@ -471,3 +471,74 @@ func TestAnchorFeedScoped(t *testing.T) {
 		t.Fatalf("same anchor for two feeds: %s", a)
 	}
 }
+
+// TestPerFeedWindowRendersSlowFeed pins the EMCR case: an item outside the
+// global window but inside its feed's own window renders; the health page
+// shows it in the items column.
+func TestPerFeedWindowRendersSlowFeed(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Settings.Dedupe = true
+	cfg.Feeds[0].DisplayWindow = firehose.Duration(60 * 24 * time.Hour)
+	old := fixedItem("EMCR Release", true)
+	// renderer "now" is 2026-07-11 12:00 UTC; 20 days back: outside 14d, inside 60d
+	old.Published = time.Date(2026, 6, 21, 12, 0, 0, 0, time.UTC)
+	r := newRenderer(t, cfg, []*firehose.Item{old})
+	if err := r.RenderAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	index := readFile(t, filepath.Join(cfg.Settings.OutputDir, "index.html"))
+	if !strings.Contains(index, "EMCR Release") {
+		t.Error("per-feed window did not rescue the old item")
+	}
+}
+
+// TestDedupeAlsoViaInMarkup pins the rendered attribution: two feeds, one
+// story, one article element, "also via" naming the echo.
+func TestDedupeAlsoViaInMarkup(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Settings.Dedupe = true
+	cfg.Feeds = append(cfg.Feeds, firehose.FeedConf{
+		URL: "https://b.example/feed", Categories: []string{"tech"}, Title: "Echo Feed",
+	})
+	origin := fixedItem("One Story", true)
+	echo := fixedItem("One Story", false)
+	echo.FeedID = 2
+	echo.GUID = "echo-guid"
+	echo.URL = origin.URL + "?utm_source=rss"
+	echo.Published = origin.Published.Add(time.Hour)
+	r := newTwoFeedRenderer(t, cfg, []*firehose.Item{echo, origin})
+	if err := r.RenderAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	index := readFile(t, filepath.Join(cfg.Settings.OutputDir, "index.html"))
+	if got := strings.Count(index, "<article"); got != 1 {
+		t.Fatalf("dedupe failed: %d articles", got)
+	}
+	if !strings.Contains(index, "also via Echo Feed") {
+		t.Error("attribution missing")
+	}
+}
+
+// newTwoFeedRenderer: the single-feed fixture plus an Echo Feed (ID 2).
+func newTwoFeedRenderer(t *testing.T, cfg *firehose.Config, items []*firehose.Item) *Renderer {
+	t.Helper()
+	is := &mock.ItemService{
+		FindItemsFn: func(ctx context.Context, f firehose.ItemFilter) ([]*firehose.Item, int, error) {
+			return items, len(items), nil
+		},
+	}
+	fs := &mock.FeedService{
+		FindFeedsFn: func(ctx context.Context, f firehose.FeedFilter) ([]*firehose.Feed, int, error) {
+			return []*firehose.Feed{
+				{ID: 1, URL: "https://a.example/feed", Title: "A Feed", Categories: []string{"tech"}},
+				{ID: 2, URL: "https://b.example/feed", Title: "Echo Feed", Categories: []string{"tech"}},
+			}, 2, nil
+		},
+	}
+	r, err := New(cfg, is, fs)
+	if err != nil {
+		t.Fatalf("new renderer: %v", err)
+	}
+	r.Now = func() time.Time { return time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC) }
+	return r
+}

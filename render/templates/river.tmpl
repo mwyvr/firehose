@@ -28,6 +28,7 @@
 {{- if .Section}}<span class="feeditem__section">{{.Section}}</span> · {{end -}}
 <time datetime="{{.Datetime}}">{{.Display}}</time>
 {{- if .Source}} · <span class="feeditem__source">{{.Source}}</span>{{end}}
+{{- if .AlsoVia}} · <span class="feeditem__alsovia">also via {{.AlsoVia}}</span>{{end}}
 {{- if .Author}} · <span class="feeditem__author">{{.Author}}</span>{{end}}
 {{- if .ReadMins}} · <span class="feeditem__readtime">~{{.ReadMins}} min</span>{{end}}
 {{- if .HasLink}} · <button class="copy" data-copy="{{.URL}}" title="Copy link" aria-label="Copy link">⧉</button> <button class="copy" data-copy="[{{.Title}}]({{.URL}})" title="Copy Markdown link" aria-label="Copy Markdown link">M↓</button>{{end}}

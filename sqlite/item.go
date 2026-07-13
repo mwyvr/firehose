@@ -218,3 +218,24 @@ func anyCategoryMatch(feedCats, want []string) bool {
 	}
 	return false
 }
+
+// ItemStats implements firehose.ItemService.
+func (s *ItemService) ItemStats(ctx context.Context) ([]firehose.ItemStat, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT feed_id, published FROM item`)
+	if err != nil {
+		return nil, firehose.Errorf(firehose.EINTERNAL, "sqlite: item stats: %v", err)
+	}
+	defer func() { _ = rows.Close() }()
+	var stats []firehose.ItemStat
+	for rows.Next() {
+		var st firehose.ItemStat
+		if err := rows.Scan(&st.FeedID, &st.Published); err != nil {
+			return nil, firehose.Errorf(firehose.EINTERNAL, "sqlite: item stats scan: %v", err)
+		}
+		stats = append(stats, st)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, firehose.Errorf(firehose.EINTERNAL, "sqlite: item stats rows: %v", err)
+	}
+	return stats, nil
+}

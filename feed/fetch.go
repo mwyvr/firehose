@@ -78,7 +78,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 	}
 
 	res.items = f.convert(fd, parsed, now, strip)
-	res.upd = success(now, true)
+	res.upd = success(now, len(res.items) > 0)
 	persistRedirect(&res.upd, fd, redirect.allPermanent, redirect.finalURL)
 	persistValidators(&res.upd, resp)
 	persistSelfTitle(&res.upd, fd, parsed)
@@ -187,9 +187,11 @@ func persistSelfTitle(upd *firehose.FeedUpdate, fd *firehose.Feed, parsed *gofee
 }
 
 // success builds the feed update for a successful contact: failure state
-// reset, fetch stamped, backoff gate cleared. producedItems distinguishes a
-// parsed 200 (stamps LastSuccess) from a 304 (does not) — the health page's
-// quiet-feed detection reads LastSuccess.
+// reset, fetch stamped, backoff gate cleared. producedItems means the fetch
+// yielded STORABLE items — a parse whose entries all fell to the retention
+// gate or filters does not stamp LastSuccess, so the health page's
+// quiet-feed detection sees through "parses fine, yields nothing". A 304
+// never stamps it.
 func success(now time.Time, producedItems bool) firehose.FeedUpdate {
 	zero := 0
 	empty := ""
