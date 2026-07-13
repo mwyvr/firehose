@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"{{if .ThemeAttr}} data-theme="{{.ThemeAttr}}"{{end}}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.SiteTitle}} :: firehose</title>
+<link rel="stylesheet" href="style.css">
+<script>(function(){var d=document.documentElement;d.setAttribute("data-theme-default",d.getAttribute("data-theme")||"");try{var t=localStorage.getItem("firehose:theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})()</script>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<header class="chrome">
+<nav class="nav">
+{{- range .Nav}}
+<a href="{{.File}}">{{.Title}}</a>
+{{- end}}
+<button class="themetoggle" aria-label="Toggle theme">◐</button>
+</nav>
+<h1 class="page__title">firehose</h1>
+<p class="health__intro">Feed health. This page is not linked from the rivers.</p>
+</header>
+<main>
+<div class="health-scroll">
+<table class="health">
+<thead><tr><th>feed</th><th>status</th><th>fails</th><th>last fetched</th><th>last success</th><th>backoff until</th><th></th></tr></thead>
+<tbody>
+{{- range .Feeds}}
+<tr class="{{if .Erroring}}health--bad{{else if .Quiet}}health--quiet{{end}}">
+<td><span class="health__title">{{.Title}}</span><br><span class="health__url">{{.URL}}</span>{{if .Categories}}<br><span class="health__cats">{{.Categories}}</span>{{end}}</td>
+<td>{{if .Status}}{{.Status}}{{else}}ok{{end}}</td>
+<td>{{.FailCount}}</td>
+<td>{{template "cell" .LastFetched}}</td>
+<td>{{template "cell" .LastSuccess}}</td>
+<td>{{template "cell" .NextEarliest}}</td>
+<td>{{if .Moved}}moved — update config{{else if .Quiet}}quiet{{end}}</td>
+</tr>
+{{- end}}
+</tbody>
+</table>
+</div>
+</main>
+<footer class="footer"><a href="https://github.com/mwyvr/firehose">firehose</a> · {{.Version}}</footer>
+<script src="river.js" defer></script>
+</body>
+</html>
+{{define "cell"}}{{if .ISO}}<time datetime="{{.ISO}}">{{.Display}}</time>{{else}}{{.Display}}{{end}}{{end}}

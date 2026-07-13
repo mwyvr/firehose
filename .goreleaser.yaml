@@ -1,0 +1,36 @@
+# goreleaser v2 — https://goreleaser.com
+# Validate locally: goreleaser check
+# Dry-run locally:  goreleaser release --snapshot --clean   (or: make snapshot)
+version: 2
+
+project_name: firehose
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: firehose
+    binary: firehose
+    main: ./cmd/firehose
+    env:
+      - CGO_ENABLED=0 # pure Go, static: one linux binary covers glibc AND musl
+    ldflags:
+      - -s -w -X github.com/mwyvr/firehose.Version=v{{ .Version }}
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    # public builds use default GOAMD64 (v1) for compatibility; the
+    # Makefile's `vps` target keeps the v2 build for known hardware.
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - docs/*
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true

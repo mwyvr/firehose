@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: vet
+        run: go vet ./...
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+
+      - name: test (race)
+        run: go test -race ./...
+
+      - name: dead code (x/tools deadcode, whole-program reachability)
+        run: |
+          go install golang.org/x/tools/cmd/deadcode@latest
+          out="$(deadcode ./cmd/firehose)"
+          if [ -n "$out" ]; then echo "$out"; exit 1; fi
+
+      - name: build as shipped (CGO disabled)
+        run: CGO_ENABLED=0 go build -o bin/firehose ./cmd/firehose
+
+      - name: cross-build for the VPS target
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v2 go build -o /dev/null ./cmd/firehose
+
+      - name: init | check round-trip smoke
+        run: |
+          ./bin/firehose init > /tmp/config.toml
+          ./bin/firehose -config /tmp/config.toml check
+          ./bin/firehose -config testdata/dev-config.toml check

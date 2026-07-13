@@ -1,0 +1,81 @@
+# firehose dev/test configuration — used by `make dev`.
+#
+# Paths are relative to the repo root (run via `make dev` from there). All
+# outputs and the cache land in build/dev/, which is disposable: `make clean`
+# removes it. Not for deployment — see docs/deploy.md for that.
+[settings]
+output_dir      = "build/dev"
+cache_db        = "build/dev/cache.db"
+timezone        = "America/Vancouver"
+body            = "excerpt"
+[fetch]
+user_agent = "firehose-dev/0 (+https://github.com/mwyvr/firehose)"
+# ── sections ────────────────────────────────────────────────────────
+[[output]]
+name       = "all"
+file       = "index.html"
+title      = "Everything"
+categories = ["*"]
+[[output]]
+name       = "gov"
+file       = "gov.html"
+title      = "Government & EM"
+categories = ["gov", "em"]
+[[output]]
+name       = "news"
+file       = "news.html"
+title      = "News"
+categories = ["news"]
+body       = "excerpt+expand"   # Guardian/CBC exercise feed-supplied full content
+[[output]]
+name       = "tech"
+file       = "tech.html"
+title      = "Technology"
+categories = ["tech"]
+body       = "excerpt+expand"
+# ── sample feeds ────────────────────────────────────────────────────
+[[feed]]
+url        = "https://news.gov.bc.ca/feed"
+title      = "BC Gov News"
+categories = ["gov"]
+[[feed]]
+url        = "https://go.dev/blog/feed.atom"
+title      = "The Go Blog"
+categories = ["tech"]
+[[feed]]
+url        = "https://www.techradar.com/feeds.xml"
+title      = "TechRadar"
+categories = ["tech"]
+[[feed]]
+url        = "https://9to5mac.com/feed/"
+title      = "9to5Mac"
+categories = ["tech"]          # WordPress RSS, content:encoded
+[[feed]]
+url        = "https://www.theverge.com/rss/index.xml"
+title      = "The Verge"
+categories = ["tech"]          # Atom, full content
+[[feed]]
+url        = "https://dropbox.tech/feed"
+title      = "Dropbox Tech"
+categories = ["tech"]          # very long full articles: excerpt+expand page-weight stress
+[[feed]]
+url        = "https://news.ycombinator.com/rss"
+title      = "Hacker News"
+categories = ["tech"]          # minimal teasers; body is just a comments link
+[[feed]]
+url        = "https://www.theguardian.com/uk/rss"
+title      = "The Guardian"
+categories = ["news"]
+[[feed]]
+url        = "https://www.cbc.ca/webfeed/rss/rss-topstories"
+title      = "CBC News"
+categories = ["news"]
+# Akamai UA-filters cbc.ca feeds (bisected with `firehose test -ua`):
+# If this goes red on the health page again, refresh the string from a
+# current-UA list such as https://www.useragents.me/ (rarely will be needed)
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+[[feed]]
+url        = "https://www.cbc.ca/webfeed/rss/rss-canada-britishcolumbia"
+title      = "CBC British Columbia"
+categories = ["news"]
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"

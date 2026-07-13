@@ -1,0 +1,147 @@
+/* firehose — one voice. Tokens + dark mode + fluid type; no breakpoints. */
+{{if .CSSURL}}@import url("{{.CSSURL}}");
+{{end}}{{if .ContentSrc}}@font-face {
+  font-family: "{{.ContentFamily}}";
+  src: url("{{.ContentSrc}}") format("woff2");
+  font-display: swap;
+}
+{{end}}{{if .ChromeSrc}}@font-face {
+  font-family: "{{.ChromeFamily}}";
+  src: url("{{.ChromeSrc}}") format("woff2");
+  font-display: swap;
+}
+{{end}}:root {
+  --measure: 68ch;
+  --font-body: "{{.ContentFamily}}", Georgia, serif;
+  --font-chrome: "{{.ChromeFamily}}", system-ui, sans-serif;
+  --step-0: clamp(1.05rem, 0.9rem + 0.6vw, 1.25rem);
+  --step--1: clamp(0.82rem, 0.74rem + 0.3vw, 0.95rem);
+  --line: 1.6;
+
+  /* Cool utility palette: a river is for scanning, not lingering (pj keeps
+     the warm paper). ONE working accent, reserved for things that go
+     somewhere — titles and links; everything else stays quiet. */
+  --ink: #33373d;
+  --bg: #f7f8fa;
+  --muted: #6b7280;
+  --rule: #e2e5ea;
+  --accent: #1e5f8a;         /* titles + links: the eye's latch */
+  --accent-visited: #64798c; /* already-clicked titles fade: free triage */
+  --link: var(--accent);
+  --bad: #b3453f;
+  --code-bg: #eef0f4;
+  color-scheme: light dark;
+}
+{{define "darkTokens"}}    --ink: #d3d7dd;
+    --bg: #15181c;
+    --muted: #8d95a0;
+    --rule: #2a2e35;
+    --accent: #7db2dd;
+    --accent-visited: #78899a;
+    --link: var(--accent);
+    --bad: #e08a85;
+    --code-bg: #1e2228;
+{{end}}/* Theme resolution: user toggle (localStorage -> data-theme) beats config
+   default (baked data-theme) beats the OS. Absent attribute = auto. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+{{template "darkTokens"}}  }
+}
+:root[data-theme="dark"] {
+{{template "darkTokens"}}}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--step-0)/var(--line) var(--font-body);
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 3rem) 1.25rem;
+}
+
+a { color: var(--link); }
+
+.chrome, .feeditem__meta, .nav { font-family: var(--font-chrome); }
+
+.nav { font-size: var(--step--1); display: flex; flex-wrap: wrap; gap: 0.75em; }
+.nav a { text-decoration: none; color: var(--muted); }
+.nav a:hover { color: var(--accent); }
+.nav button.themetoggle {
+  margin-left: auto; background: none; border: none; padding: 0;
+  cursor: pointer; color: var(--muted); font: inherit; font-size: 1.05em;
+}
+.nav button.themetoggle:hover { color: var(--accent); }
+.nav a.nav__current { color: var(--ink); font-weight: 600; }
+
+/* Explicit 600: the loaded webfont faces are 400/600; browser-default bold
+   (700) would force a synthesized face. */
+.page__title, .feeditem__title, strong, b, th { font-weight: 600; }
+
+.page__title { font-size: 1.4em; margin: 0.5em 0 0.9em; }
+
+.feeditem { padding: 0.85em 0; border-top: 1px solid var(--rule); }
+
+.feeditem__title { font-size: 1.15em; margin: 0 0 0.15em; line-height: 1.3; }
+.feeditem__title a { color: var(--accent); text-decoration: none; }
+.feeditem__title a:visited { color: var(--accent-visited); }
+.feeditem__title a:hover { text-decoration: underline; }
+
+.feeditem__meta { font-size: var(--step--1); color: var(--muted); margin: 0 0 0.45em; }
+
+/* Publisher thematic breaks pass the structural policy (by design), but a
+   full-width rule inside a body would mimic the item separator. Render them
+   short, centered, dotted: clearly a break WITHIN a piece. */
+.feeditem__body hr { border: none; border-top: 1px dotted var(--rule); width: 25%; margin: 1.1em auto; }
+.feeditem__meta a { color: var(--muted); }
+.feeditem__section { text-transform: uppercase; letter-spacing: 0.05em; }
+
+.feeditem__body { overflow-wrap: anywhere; }
+.feeditem__body img, .feeditem__full img {
+  max-width: 100%; max-height: 24rem; height: auto; display: block; margin: 0.75em 0;
+}
+.feeditem__leadimage { margin: 0 0 0.75em; }
+.feeditem__leadimage img { max-height: 18rem; }
+
+blockquote { margin: 0.75em 0; padding-left: 1em; border-left: 3px solid var(--rule); color: var(--muted); }
+
+pre { background: var(--code-bg); padding: 0.75em 1em; overflow-x: auto; font-size: 0.85em; }
+code { background: var(--code-bg); padding: 0.1em 0.3em; }
+pre code { padding: 0; background: none; }
+
+details.feeditem__more summary {
+  cursor: pointer; font-family: var(--font-chrome);
+  font-size: var(--step--1); color: var(--link);
+}
+
+button.copy {
+  font: inherit; font-size: 1em; color: var(--muted);
+  background: none; border: none; padding: 0; cursor: pointer;
+}
+button.copy:hover { color: var(--ink); }
+
+.footer {
+  font-family: var(--font-chrome); font-size: var(--step--1); color: var(--muted);
+  text-align: center; margin: 2.5em 0 1em;
+}
+.footer a { color: var(--muted); text-decoration: none; }
+.footer a:hover { color: var(--accent); }
+
+.readmark {
+  font-family: var(--font-chrome); font-size: var(--step--1);
+  color: var(--bad); text-align: center; letter-spacing: 0.1em;
+  margin: 0.4em 0; border-top: 1px dotted var(--bad); padding-top: 0.4em;
+}
+
+/* The health table is wider than a phone; scroll it sideways rather than
+   crushing columns (fluid design, still no breakpoints). */
+.health-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.health { border-collapse: collapse; width: 100%; min-width: 44rem; font-family: var(--font-chrome); font-size: var(--step--1); }
+.health th, .health td { text-align: left; padding: 0.4em 0.6em; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.health__url { color: var(--muted); overflow-wrap: anywhere; }
+.health__cats { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.85em; }
+.health--bad td { color: var(--bad); }
+.health--quiet td { color: var(--muted); }
