@@ -67,13 +67,15 @@ server infrastructure you already have in place. See examples and more in
 
 ## Changelog
 
+- v0.2.0, 2026-07-13: Cross-feed dedupe with "also via" attribution;
+  per-feed `display_window`; health page items column (shown / cached) and
+  honest last-success (yielded items, not merely parsed).
 - v0.1.0, 2026-07-12: Eat my own dog food initial beta release.
 
 ## Future
 
 Not a lot planned. Possibly:
 
-- Cross-feed dedupe (the same item arriving via multiple feeds)
 - OPML import (`firehose export` already writes OPML)
 - *Maybe* user-definable templates and CSS overrides.
 
