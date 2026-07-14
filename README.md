@@ -3,8 +3,18 @@
 [![ci](https://github.com/mwyvr/firehose/actions/workflows/ci.yml/badge.svg)](https://github.com/mwyvr/firehose/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)![Coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
 
-
 # firehose
+
+<!--toc:start-->
+- [firehose](#firehose)
+  - [Install](#install)
+  - [Examples](#examples)
+  - [Quick start](#quick-start)
+  - [Deployment](#deployment)
+  - [Changelog](#changelog)
+  - [Future](#future)
+  - [License](#license)
+<!--toc:end-->
 
 `firehose` is an RSS/Atom feed aggregator and static HTML generator that renders
 your chosen feeds as a single reverse-chronological *river of news*. Inbound
@@ -17,6 +27,8 @@ a systemd timer or cron. Nothing stays resident and nothing listens on a port.
 Deploy locally or remote using the web infrastructure you already have.
 
 Why the name? Think *drinking from a fire hose*.
+
+
 
 ## Install
 
