@@ -30,6 +30,9 @@ Or, build it yourself:
 ```
 go install github.com/mwyvr/firehose/cmd/firehose@latest
 ```
+## Examples
+
+![Example 1](docs/firehose1.png) ![Example 2](docs/firehose2.png)
 
 ## Quick start
 
