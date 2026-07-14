@@ -10,7 +10,7 @@ LINUX  := bin/firehose-linux-amd64
 PKG    := ./cmd/firehose
 DEVDIR := build/dev
 
-.PHONY: all fmt vet test build vps dev deploy tidy snapshot clean
+.PHONY: all fmt vet test build vps dev deploy tidy snapshot clean edit bump force
 
 all: fmt vet test build
 
@@ -64,6 +64,20 @@ dev: build
 	./$(BIN) -config $(DEVDIR)/config.toml
 	@echo ""
 	@echo "dev run complete — open $(DEVDIR)/index.html  (health: $(DEVDIR)/firehose.html)"
+
+# edit the remote config
+edit:
+	ssh -t $(HOST) '$(EDITOR) /etc/firehose/config.toml'
+
+# restart the service, run respecting politeness
+bump:
+	ssh -t $(HOST) 'systemctl restart firehose.service \
+		&& systemctl status firehose.service --no-pager -n 0'
+
+# bypass systemd, force full refresh
+force:
+	ssh -t $(HOST) 'sudo /usr/local/bin/firehose -force \
+		&& systemctl status firehose.service --no-pager -n 0'
 
 clean:
 	rm -rf bin build dist
