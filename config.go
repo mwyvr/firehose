@@ -2,6 +2,7 @@ package firehose
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -294,7 +295,7 @@ func (c *Config) Validate() error {
 			if cat == "*" {
 				haveAll = true
 			} else {
-				selected[cat] = true
+				selected[strings.ToLower(cat)] = true // matching is case-insensitive
 			}
 		}
 	}
@@ -334,7 +335,7 @@ func (c *Config) Validate() error {
 		}
 		if !haveAll {
 			for _, cat := range fd.Categories {
-				if !selected[cat] {
+				if !selected[strings.ToLower(cat)] {
 					return Errorf(EINVALID,
 						"feed %s: category %q is not selected by any output and there is no ALL river",
 						fd.URL, cat)

@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"slices"
 	"strings"
 	"time"
 
@@ -64,7 +63,7 @@ func (s *ItemService) FindItems(ctx context.Context, filter firehose.ItemFilter)
 		if err != nil {
 			return nil, 0, err
 		}
-		if len(wantCats) > 0 && !anyCategoryMatch(cats, wantCats) {
+		if len(wantCats) > 0 && !firehose.CategoriesIntersect(cats, wantCats) {
 			continue
 		}
 		it.Categories = cats
@@ -206,17 +205,6 @@ func (s *ItemService) scanItem(rows *sql.Rows) (*firehose.Item, []string, error)
 	it.FetchedAt = fetchedAt.In(s.db.loc)
 	it.FullContent = fullContent != 0
 	return &it, decodeCategories(cats), nil
-}
-
-// anyCategoryMatch reports whether the feed's categories intersect the wanted
-// set. "*" in want matches everything.
-func anyCategoryMatch(feedCats, want []string) bool {
-	for _, w := range want {
-		if w == "*" || slices.Contains(feedCats, w) {
-			return true
-		}
-	}
-	return false
 }
 
 // ItemStats implements firehose.ItemService.

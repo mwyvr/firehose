@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"slices"
 	"strings"
 	"time"
 
@@ -73,7 +72,7 @@ func (s *FeedService) FindFeeds(ctx context.Context, filter firehose.FeedFilter)
 		if err != nil {
 			return nil, 0, err
 		}
-		if filter.Category != nil && !slices.Contains(f.Categories, *filter.Category) {
+		if filter.Category != nil && !firehose.ContainsCategory(f.Categories, *filter.Category) {
 			continue
 		}
 		feeds = append(feeds, f)

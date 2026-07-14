@@ -2,7 +2,6 @@ package firehose
 
 import (
 	"encoding/xml"
-	"slices"
 )
 
 // OPML is the domain representation of the feed list for interchange
@@ -80,7 +79,7 @@ func BuildOPML(cfg *Config, section string) *OPML {
 
 func feedInOutput(fc FeedConf, out *Output) bool {
 	for _, c := range fc.Categories {
-		if slices.Contains(out.Categories, c) {
+		if ContainsCategory(out.Categories, c) {
 			return true
 		}
 	}

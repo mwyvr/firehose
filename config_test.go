@@ -250,3 +250,21 @@ display_window = "1440h"
 		t.Fatalf("want EINVALID, got %v", err)
 	}
 }
+
+// TestCategoryCaseInsensitiveValidation pins the fix: a feed tagged "Tech"
+// reaching an output selecting "tech" is valid — categories compare folded.
+func TestCategoryCaseInsensitiveValidation(t *testing.T) {
+	_, err := LoadConfig(writeConfig(t, `
+[[output]]
+name = "tech"
+file = "tech.html"
+categories = ["tech"]
+
+[[feed]]
+url = "https://a.example/feed"
+categories = ["Tech"]
+`))
+	if err != nil {
+		t.Fatalf("mixed-case category rejected: %v", err)
+	}
+}
