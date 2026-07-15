@@ -65,9 +65,10 @@ dev: build
 	@echo ""
 	@echo "dev run complete — open $(DEVDIR)/index.html  (health: $(DEVDIR)/firehose.html)"
 
-# edit the remote config
+# edit the remote config, check after
 edit:
-	ssh -t $(HOST) '$(EDITOR) /etc/firehose/config.toml'
+	ssh -t $(HOST) '$(EDITOR) /etc/firehose/config.toml \
+		&& /usr/local/bin/firehose check'
 
 # restart the service, run respecting politeness
 bump:
