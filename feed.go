@@ -27,11 +27,12 @@ type Feed struct {
 
 	// Config-derived per-feed overrides. Nil/zero means "inherit from output
 	// then settings" per the three-tier resolution.
-	Body           string   // "", title, excerpt, full, excerpt+expand
-	ExcerptImage   string   // "", lead, none
-	Exclude        []string // simple keyword filters (config, not hook)
-	Include        []string // simple keyword filters (config, not hook)
-	StripSelectors []string // per-feed cruft removal, applied post-parse
+	Body           string            // "", title, excerpt, full, excerpt+expand
+	ExcerptImage   string            // "", lead, none
+	Exclude        []string          // simple keyword filters (config, not hook)
+	RewriteHost    map[string]string // wrong host -> right host (config-only, overlaid per run)
+	Include        []string          // simple keyword filters (config, not hook)
+	StripSelectors []string          // per-feed cruft removal, applied post-parse
 
 	// Per-feed fetch overrides for CDN-hostile endpoints. UserAgent replaces
 	// the global one; Headers are set verbatim on the request. Identifying

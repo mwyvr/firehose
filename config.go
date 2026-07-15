@@ -93,15 +93,16 @@ type OutputConf struct {
 
 // FeedConf is a configured feed and its per-feed overrides.
 type FeedConf struct {
-	URL            string       `toml:"url"`
-	Title          string       `toml:"title"` // override garbage self-reported titles
-	Categories     []string     `toml:"categories"`
-	Body           BodyScope    `toml:"body"`
-	ExcerptImage   ExcerptImage `toml:"excerpt_image"`
-	Exclude        []string     `toml:"exclude"`
-	Include        []string     `toml:"include"`
-	StripSelectors []string     `toml:"strip_selectors"`
-	DisplayWindow  Duration     `toml:"display_window"` // per-feed override; zero inherits settings
+	URL            string            `toml:"url"`
+	Title          string            `toml:"title"` // override garbage self-reported titles
+	Categories     []string          `toml:"categories"`
+	Body           BodyScope         `toml:"body"`
+	ExcerptImage   ExcerptImage      `toml:"excerpt_image"`
+	Exclude        []string          `toml:"exclude"`
+	Include        []string          `toml:"include"`
+	StripSelectors []string          `toml:"strip_selectors"`
+	DisplayWindow  Duration          `toml:"display_window"` // per-feed override; zero inherits settings
+	RewriteHost    map[string]string `toml:"rewrite_host"`   // wrong host -> right host in item links/GUIDs
 
 	// Per-feed fetch overrides (CDN-hostile endpoints).
 	UserAgent string            `toml:"user_agent"`
@@ -329,6 +330,13 @@ func (c *Config) Validate() error {
 		fd := &c.Feeds[i]
 		if fd.URL == "" {
 			return Errorf(EINVALID, "feed[%d]: url is required", i)
+		}
+		for from, to := range fd.RewriteHost {
+			if from == "" || to == "" || strings.ContainsAny(from+to, "/:") {
+				return Errorf(EINVALID,
+					"feed %s: rewrite_host entries must map bare hostname to bare hostname, got %q = %q",
+					fd.URL, from, to)
+			}
 		}
 		if IsLocalFeed(fd.URL) && !strings.HasPrefix(LocalFeedPath(fd.URL), "/") {
 			return Errorf(EINVALID,

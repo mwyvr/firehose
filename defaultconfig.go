@@ -137,6 +137,9 @@ categories = ["example"]
 # url        = "file:///var/lib/hydrant/feeds/site.xml"
 # categories = ["scraped"]
 # display_window  = "1440h"             # per-feed window (slow civic feeds); must fit cache_retention
+# Fix feeds that emit another site's hostname in item links and GUIDs.
+# A key matches itself and its subdomains ("wrong.example" covers www).
+# rewrite_host    = { "wrong.example" = "right.example" }
 `,
 		compactDuration(d.Settings.DisplayWindow.D()),
 		compactDuration(d.Settings.CacheRetention.D()),

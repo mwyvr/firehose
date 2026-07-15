@@ -134,6 +134,7 @@ func (f *Fetcher) Run(ctx context.Context) error {
 			fd.StripSelectors = fc.StripSelectors
 			fd.UserAgent = fc.UserAgent
 			fd.Headers = fc.Headers
+			fd.RewriteHost = fc.RewriteHost
 		}
 	}
 

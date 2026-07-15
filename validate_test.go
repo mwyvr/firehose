@@ -76,6 +76,13 @@ categories = ["y"]
 categories = ["x"]
 `, "url is required"},
 
+		{"rewrite_host with scheme", allOutput + `
+[[feed]]
+url = "https://a.example/feed"
+categories = ["x"]
+rewrite_host = { "https://wrong.example" = "right.example" }
+`, "rewrite_host"},
+
 		{"unknown theme", `
 theme = "sepia"
 ` + allOutput, "sepia"},

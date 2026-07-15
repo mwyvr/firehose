@@ -58,10 +58,11 @@ func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cuto
 	}
 
 	return &firehose.Item{
-		FeedID:      fd.ID,
-		GUID:        guid,
-		Title:       entry.Title,
-		URL:         entry.Link, // may be empty: linkless-title rule at render
+		FeedID: fd.ID,
+		GUID:   firehose.RewriteHost(guid, fd.RewriteHost),
+		Title:  entry.Title,
+		// may be empty: linkless-title rule at render
+		URL:         firehose.RewriteHost(entry.Link, fd.RewriteHost),
 		Author:      entryAuthor(entry),
 		Published:   published.UTC(),
 		BodyHTML:    clean,
