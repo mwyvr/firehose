@@ -43,6 +43,7 @@ type Settings struct {
 	Theme              string       `toml:"theme"`           // auto | light | dark (page default; toggle overrides)
 	HighlightTheme     string       `toml:"highlight_theme"` // chroma style, light mode
 	HighlightThemeDark string       `toml:"highlight_theme_dark"`
+	LinksNewTab        bool         `toml:"links_new_tab"` // story links open in a new tab (render-time <base>)
 
 	// Integration with the Author's CMS; NoteTemplate, when set, renders a per-item "note" link with {title} and
 	// {url} substituted (query-escaped) No backend: it is just a URL and could be used to support other CMS.

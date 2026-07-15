@@ -43,12 +43,13 @@ type itemView struct {
 
 // pageView is the river template's data.
 type pageView struct {
-	SiteTitle string
-	Title     string
-	ThemeAttr string // baked config default ("" = auto); toggle overrides
-	Version   string
-	Nav       []navLink
-	Items     []itemView
+	SiteTitle   string
+	Title       string
+	ThemeAttr   string // baked config default ("" = auto); toggle overrides
+	LinksNewTab bool   // render-time <base target="_blank">; nav pinned _self
+	Version     string
+	Nav         []navLink
+	Items       []itemView
 }
 
 func (r *Renderer) renderRiver(ctx context.Context, out *firehose.Output, nav []navLink, meta map[int64]feedMeta) error {
@@ -65,11 +66,12 @@ func (r *Renderer) renderRiver(ctx context.Context, out *firehose.Output, nav []
 	}
 
 	pv := pageView{
-		ThemeAttr: r.themeAttr(),
-		Version:   firehose.Version,
-		SiteTitle: siteTitle,
-		Title:     out.Title,
-		Items:     make([]itemView, 0, len(items)),
+		ThemeAttr:   r.themeAttr(),
+		LinksNewTab: r.cfg.Settings.LinksNewTab,
+		Version:     firehose.Version,
+		SiteTitle:   siteTitle,
+		Title:       out.Title,
+		Items:       make([]itemView, 0, len(items)),
 	}
 	// Mark the current page in a copy of the nav.
 	pv.Nav = make([]navLink, len(nav))

@@ -83,6 +83,7 @@ highlight       = true   # highlight ONLY declared languages; never guess
 dedupe          = true   # collapse the same story arriving via multiple feeds (canonical-URL identity)
 highlight_theme = %q     # chroma style names (light / dark mode)
 highlight_theme_dark = %q
+links_new_tab   = false  # open story links in a new tab/window (site nav stays in-tab)
 # note_template = "https://example.org/notes/new?title={title}&url={url}"  # per-item "note" link
 
 [fetch]

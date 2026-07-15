@@ -30,11 +30,12 @@ type healthRow struct {
 }
 
 type healthView struct {
-	SiteTitle string
-	ThemeAttr string
-	Version   string
-	Nav       []navLink
-	Feeds     []healthRow
+	SiteTitle   string
+	ThemeAttr   string
+	LinksNewTab bool
+	Version     string
+	Nav         []navLink
+	Feeds       []healthRow
 }
 
 // quietAfter marks a feed quiet when it has fetched fine but produced nothing
@@ -69,7 +70,8 @@ func (r *Renderer) renderHealth(ctx context.Context, out *firehose.Output, nav [
 		}
 	}
 
-	hv := healthView{SiteTitle: siteTitle, ThemeAttr: r.themeAttr(), Version: firehose.Version, Nav: nav}
+	hv := healthView{SiteTitle: siteTitle, ThemeAttr: r.themeAttr(), Version: firehose.Version, Nav: nav,
+		LinksNewTab: r.cfg.Settings.LinksNewTab}
 	for _, f := range stored {
 		row := healthRow{
 			Title:        f.Title,

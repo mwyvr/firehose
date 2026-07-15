@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.SiteTitle}}{{if .Title}} :: {{.Title}}{{end}}</title>
+{{if .LinksNewTab}}<base target="_blank">
+{{end -}}
 <link rel="stylesheet" href="style.css">
 <script>(function(){var d=document.documentElement;d.setAttribute("data-theme-default",d.getAttribute("data-theme")||"");try{var t=localStorage.getItem("firehose:theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})()</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -14,7 +16,7 @@
 <header class="chrome">
 <nav class="nav">
 {{- range .Nav}}
-<a href="{{.File}}"{{if .Current}} aria-current="page" class="nav__current"{{end}}>{{.Title}}</a>
+<a href="{{.File}}"{{if .Current}} aria-current="page" class="nav__current"{{end}}{{if $.LinksNewTab}} target="_self"{{end}}>{{.Title}}</a>
 {{- end}}
 <button class="themetoggle" aria-label="Toggle theme">◐</button>
 </nav>

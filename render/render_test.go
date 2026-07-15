@@ -542,3 +542,40 @@ func newTwoFeedRenderer(t *testing.T, cfg *firehose.Config, items []*firehose.It
 	r.Now = func() time.Time { return time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC) }
 	return r
 }
+
+// TestLinksNewTab pins the render-time <base target="_blank"> option: off
+// by default (standard web behavior), and when enabled the base tag
+// appears in the head while site navigation is pinned target="_self" so
+// section switching never spawns tabs. Stored body HTML is untouched —
+// the whole mechanism is render-time, so toggling takes effect on the
+// next generate with no cache implications.
+func TestLinksNewTab(t *testing.T) {
+	cfg := testConfig(t)
+	it := fixedItem("Hello World", true)
+	r := newRenderer(t, cfg, []*firehose.Item{it})
+	if err := r.RenderAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	index := readFile(t, filepath.Join(cfg.Settings.OutputDir, "index.html"))
+	if strings.Contains(index, "<base") {
+		t.Error("base tag must be absent by default")
+	}
+
+	cfg2 := testConfig(t)
+	cfg2.Settings.LinksNewTab = true
+	r2 := newRenderer(t, cfg2, []*firehose.Item{it})
+	if err := r2.RenderAll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	index2 := readFile(t, filepath.Join(cfg2.Settings.OutputDir, "index.html"))
+	if !strings.Contains(index2, `<base target="_blank">`) {
+		t.Error("base tag missing when enabled")
+	}
+	if !strings.Contains(index2, `target="_self"`) {
+		t.Error("nav links must be pinned same-tab when enabled")
+	}
+	health := readFile(t, filepath.Join(cfg2.Settings.OutputDir, "firehose.html"))
+	if !strings.Contains(health, `<base target="_blank">`) {
+		t.Error("health page must honor the option too")
+	}
+}
