@@ -75,7 +75,6 @@ type ProbeRequest struct {
 	URL       string
 	UserAgent string            // overrides fetch.UserAgent when set
 	Headers   map[string]string // set verbatim, last
-	Location  *time.Location    // for the loose-date rescue; nil = local
 }
 
 // RunProbe fetches and analyses a single feed URL with the configured fetch
@@ -87,7 +86,7 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 	p := &Probe{RequestURL: feedURL, FinalURL: feedURL}
 
 	if firehose.IsLocalFeed(feedURL) {
-		return probeLocal(p, feedURL, preq.Location)
+		return probeLocal(p, feedURL)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
@@ -150,7 +149,7 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 		return p, firehose.Errorf(p.ErrCode, "HTTP %d", resp.StatusCode)
 	}
 
-	return analyzeProbeBody(p, body, feedURL, preq.Location)
+	return analyzeProbeBody(p, body, feedURL)
 }
 
 func snippet(body []byte) string {
@@ -164,7 +163,7 @@ func snippet(body []byte) string {
 // analyzeProbeBody is the transport-independent half of a probe: parse the
 // document and report type, item count, and the first-item analysis. Shared
 // by the network and file:// paths.
-func analyzeProbeBody(p *Probe, body []byte, feedURL string, loc *time.Location) (*Probe, error) {
+func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 	parsed, err := gofeed.NewParser().ParseString(string(body))
 	if err != nil {
 		p.ErrCode = firehose.EPARSE
@@ -181,7 +180,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string, loc *time.Location)
 		if it == nil {
 			continue
 		}
-		switch _, tier := resolvePublished(it, loc); tier {
+		switch _, tier := resolvePublished(it); tier {
 		case DateFromFeed:
 			p.DatesFeed++
 		case DateRescued:
@@ -204,7 +203,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string, loc *time.Location)
 		}
 		clean, words := Sanitize(raw, base, nil)
 		lead := firstImgSrc(clean)
-		published, tier := resolvePublished(it, loc)
+		published, tier := resolvePublished(it)
 		p.First = &ProbeItem{
 			Title:         it.Title,
 			Link:          it.Link,
@@ -222,7 +221,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string, loc *time.Location)
 }
 
 // probeLocal is `firehose test` for a file:// feed
-func probeLocal(p *Probe, feedURL string, loc *time.Location) (*Probe, error) {
+func probeLocal(p *Probe, feedURL string) (*Probe, error) {
 	path := firehose.LocalFeedPath(feedURL)
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -246,5 +245,5 @@ func probeLocal(p *Probe, feedURL string, loc *time.Location) (*Probe, error) {
 		return p, firehose.Errorf(p.ErrCode, "read: %v", err)
 	}
 	p.BodyBytes = len(body)
-	return analyzeProbeBody(p, body, feedURL, loc)
+	return analyzeProbeBody(p, body, feedURL)
 }

@@ -15,22 +15,18 @@ import (
 // verbatim from a live Govstack feed, all of which gofeed returns nil for: full
 // month name, no timezone.
 func TestParseLooseDateGovstack(t *testing.T) {
-	loc, err := time.LoadLocation("America/Dawson_Creek")
-	if err != nil {
-		t.Fatal(err)
-	}
 	cases := []struct {
 		raw  string
 		want time.Time
 	}{
-		{"Tue, 14 July 2026 23:00:00", time.Date(2026, 7, 14, 23, 0, 0, 0, loc)},
-		{"Mon, 06 June 2022 16:00:00", time.Date(2022, 6, 6, 16, 0, 0, 0, loc)},
-		{"Wed, 11 October 2023 16:00:00", time.Date(2023, 10, 11, 16, 0, 0, 0, loc)},
-		{"Wed, 11 February 2026 17:05:00", time.Date(2026, 2, 11, 17, 5, 0, 0, loc)},
-		{"Fri, 12 December 2025 23:00:00", time.Date(2025, 12, 12, 23, 0, 0, 0, loc)},
+		{"Tue, 14 July 2026 23:00:00", time.Date(2026, 7, 14, 23, 0, 0, 0, time.UTC)},
+		{"Mon, 06 June 2022 16:00:00", time.Date(2022, 6, 6, 16, 0, 0, 0, time.UTC)},
+		{"Wed, 11 October 2023 16:00:00", time.Date(2023, 10, 11, 16, 0, 0, 0, time.UTC)},
+		{"Wed, 11 February 2026 17:05:00", time.Date(2026, 2, 11, 17, 5, 0, 0, time.UTC)},
+		{"Fri, 12 December 2025 23:00:00", time.Date(2025, 12, 12, 23, 0, 0, 0, time.UTC)},
 	}
 	for _, tc := range cases {
-		got, ok := parseLooseDate(tc.raw, loc)
+		got, ok := parseLooseDate(tc.raw)
 		if !ok {
 			t.Errorf("%q: not parsed", tc.raw)
 			continue
@@ -39,10 +35,10 @@ func TestParseLooseDateGovstack(t *testing.T) {
 			t.Errorf("%q: got %v want %v", tc.raw, got, tc.want)
 		}
 	}
-	if _, ok := parseLooseDate("not a date at all", loc); ok {
+	if _, ok := parseLooseDate("not a date at all"); ok {
 		t.Error("garbage must not parse")
 	}
-	if _, ok := parseLooseDate("", loc); ok {
+	if _, ok := parseLooseDate(""); ok {
 		t.Error("empty must not parse")
 	}
 }
@@ -62,10 +58,6 @@ func TestGovstackFeedEndToEnd(t *testing.T) {
 
 	fd := &firehose.Feed{ID: 1, URL: srv.URL}
 	h := newHarness(t, []*firehose.Feed{fd})
-	// Pin the rescue timezone: without this the zoneless pubDate is
-	// interpreted in the machine's local zone and the stored (UTC-
-	// normalized) instant varies by geography — 23:00 PDT is July 15 UTC.
-	h.fetcher.cfg.Location = time.UTC
 	if err := h.fetcher.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +78,6 @@ func TestGovstackFeedEndToEnd(t *testing.T) {
 // standard dates report DateFromFeed, Govstack dates DateRescued, garbage
 // and dateless entries DateNone.
 func TestResolvePublishedTiers(t *testing.T) {
-	loc := time.UTC
 	cases := []struct {
 		name string
 		body string
@@ -101,7 +92,7 @@ func TestResolvePublishedTiers(t *testing.T) {
 		p := &Probe{}
 		body := `<rss version="2.0"><channel><title>T</title><item><title>X</title>` +
 			`<link>https://x.example/a</link>` + tc.body + `</item></channel></rss>`
-		if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed", loc); err != nil {
+		if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed"); err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
 		if p.First == nil || p.First.PublishedTier != tc.tier {
@@ -121,7 +112,7 @@ func TestProbeDateStats(t *testing.T) {
 <item><title>D</title><link>https://x.example/d</link></item>
 </channel></rss>`
 	p := &Probe{}
-	if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed", time.UTC); err != nil {
+	if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed"); err != nil {
 		t.Fatal(err)
 	}
 	if p.DatesFeed != 1 || p.DatesRescued != 1 || p.DatesUnparsed != 2 {

@@ -37,7 +37,7 @@ func (f *Fetcher) convert(fd *firehose.Feed, parsed *gofeed.Feed, now time.Time,
 // works on a parsed-and-normalized tree; filters match against the final
 // text a reader would see.
 func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cutoff time.Time, strip []cascadia.SelectorGroup) *firehose.Item {
-	published := publishedTime(entry, now, f.cfg.Location)
+	published := publishedTime(entry, now)
 	if published.Before(cutoff) {
 		return nil // would be purged immediately; skip the work
 	}
@@ -111,8 +111,8 @@ func (f *Fetcher) renderVoice(raw, summaryRaw, base string, strip []cascadia.Sel
 
 // publishedTime prefers the published stamp, falls back to updated, and
 // finally to the fetch time (an undated item is treated as new).
-func publishedTime(entry *gofeed.Item, now time.Time, loc *time.Location) time.Time {
-	if t, tier := resolvePublished(entry, loc); tier != DateNone {
+func publishedTime(entry *gofeed.Item, now time.Time) time.Time {
+	if t, tier := resolvePublished(entry); tier != DateNone {
 		return t
 	}
 	return now
