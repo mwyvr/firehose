@@ -152,6 +152,13 @@ func LoadConfig(path string) (*Config, error) {
 		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("unknown config key %q", key.String()))
 	}
 
+	// A bare absolute path is a local feed
+	for i, fc := range cfg.Feeds {
+		if strings.HasPrefix(fc.URL, "/") {
+			cfg.Feeds[i].URL = "file://" + fc.URL
+		}
+	}
+
 	if err := cfg.resolveLocation(); err != nil {
 		return nil, err
 	}
@@ -322,6 +329,10 @@ func (c *Config) Validate() error {
 		fd := &c.Feeds[i]
 		if fd.URL == "" {
 			return Errorf(EINVALID, "feed[%d]: url is required", i)
+		}
+		if IsLocalFeed(fd.URL) && !strings.HasPrefix(LocalFeedPath(fd.URL), "/") {
+			return Errorf(EINVALID,
+				"feed %s: local feed path must be absolute (the systemd unit's working directory is not yours)", fd.URL)
 		}
 		if seenFeed[fd.URL] {
 			return Errorf(EINVALID, "duplicate feed url %s", fd.URL)

@@ -31,6 +31,10 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 		}
 	}()
 
+	if firehose.IsLocalFeed(fd.URL) {
+		return f.fetchLocal(fd)
+	}
+
 	defer f.lockHost(fd.URL)()
 
 	req, err := f.buildRequest(ctx, fd)

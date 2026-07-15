@@ -2,9 +2,11 @@ package feed
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -75,6 +77,10 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 	feedURL := preq.URL
 	p := &Probe{RequestURL: feedURL, FinalURL: feedURL}
 
+	if firehose.IsLocalFeed(feedURL) {
+		return probeLocal(p, feedURL)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
 		p.ErrCode = firehose.EINVALID
@@ -135,6 +141,21 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 		return p, firehose.Errorf(p.ErrCode, "HTTP %d", resp.StatusCode)
 	}
 
+	return analyzeProbeBody(p, body, feedURL)
+}
+
+func snippet(body []byte) string {
+	s := strings.TrimSpace(string(body))
+	if len(s) > snippetLen {
+		s = s[:snippetLen] + "\u2026"
+	}
+	return s
+}
+
+// analyzeProbeBody is the transport-independent half of a probe: parse the
+// document and report type, item count, and the first-item analysis. Shared
+// by the network and file:// paths.
+func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 	parsed, err := gofeed.NewParser().ParseString(string(body))
 	if err != nil {
 		p.ErrCode = firehose.EPARSE
@@ -180,10 +201,30 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 	return p, nil
 }
 
-func snippet(body []byte) string {
-	s := strings.TrimSpace(string(body))
-	if len(s) > snippetLen {
-		s = s[:snippetLen] + "\u2026"
+// probeLocal is `firehose test` for a file:// feed
+func probeLocal(p *Probe, feedURL string) (*Probe, error) {
+	path := firehose.LocalFeedPath(feedURL)
+	fi, err := os.Stat(path)
+	if err != nil {
+		p.ErrCode = firehose.EINTERNAL
+		if errors.Is(err, os.ErrNotExist) {
+			p.ErrCode = firehose.ENOTFOUND
+		}
+		return p, firehose.Errorf(p.ErrCode, "stat: %v", err)
 	}
-	return s
+	p.LastModified = fi.ModTime().UTC().Format(http.TimeFormat)
+
+	fh, err := os.Open(path)
+	if err != nil {
+		p.ErrCode = firehose.EINTERNAL
+		return p, firehose.Errorf(p.ErrCode, "open: %v", err)
+	}
+	defer func() { _ = fh.Close() }()
+	body, err := io.ReadAll(io.LimitReader(fh, maxBodyBytes))
+	if err != nil {
+		p.ErrCode = firehose.EINTERNAL
+		return p, firehose.Errorf(p.ErrCode, "read: %v", err)
+	}
+	p.BodyBytes = len(body)
+	return analyzeProbeBody(p, body, feedURL)
 }

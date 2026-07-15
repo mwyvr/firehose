@@ -130,6 +130,10 @@ categories = ["example"]
 # exclude         = ["sponsored"]       # drop items matching these keywords
 # include         = []                  # keep only matching items
 # strip_selectors = ["div.sharedaddy"]  # remove cruft nodes post-parse
+# A local feed document (e.g. from a scraper). Can be a bare absolute path.
+# [[feed]]
+# url        = "file:///var/lib/hydrant/feeds/site.xml"
+# categories = ["scraped"]
 # display_window  = "1440h"             # per-feed window (slow civic feeds); must fit cache_retention
 `,
 		compactDuration(d.Settings.DisplayWindow.D()),
