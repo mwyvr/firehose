@@ -28,7 +28,7 @@ func (f *Fetcher) convert(fd *firehose.Feed, parsed *gofeed.Feed, now time.Time,
 }
 
 // itemFromEntry converts one entry, or returns nil to skip it. The content
-// pipeline order is LOAD-BEARING:
+// pipeline order:
 //
 //	select body -> sanitize -> typography -> highlight -> filters
 //
@@ -37,7 +37,7 @@ func (f *Fetcher) convert(fd *firehose.Feed, parsed *gofeed.Feed, now time.Time,
 // works on a parsed-and-normalized tree; filters match against the final
 // text a reader would see.
 func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cutoff time.Time, strip []cascadia.SelectorGroup) *firehose.Item {
-	published := publishedTime(entry, now)
+	published := publishedTime(entry, now, f.cfg.Location)
 	if published.Before(cutoff) {
 		return nil // would be purged immediately; skip the work
 	}
@@ -111,12 +111,20 @@ func (f *Fetcher) renderVoice(raw, summaryRaw, base string, strip []cascadia.Sel
 
 // publishedTime prefers the published stamp, falls back to updated, and
 // finally to the fetch time (an undated item is treated as new).
-func publishedTime(entry *gofeed.Item, now time.Time) time.Time {
+func publishedTime(entry *gofeed.Item, now time.Time, loc *time.Location) time.Time {
 	switch {
 	case entry.PublishedParsed != nil:
 		return *entry.PublishedParsed
 	case entry.UpdatedParsed != nil:
 		return *entry.UpdatedParsed
+	}
+	// gofeed failed, but the raw strings survive: try the loose layouts
+	// (Govstack-style civic dates) before surrendering to fetch time.
+	if t, ok := parseLooseDate(entry.Published, loc); ok {
+		return t
+	}
+	if t, ok := parseLooseDate(entry.Updated, loc); ok {
+		return t
 	}
 	return now
 }

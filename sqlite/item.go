@@ -100,8 +100,12 @@ func (s *ItemService) UpsertItems(ctx context.Context, items []*firehose.Item) e
 	}
 	defer func() { _ = findStmt.Close() }()
 
-	// ON CONFLICT(feed_id, guid) updates the mutable content columns but never
-	// the id, so a re-published item keeps its original identity.
+	// ON CONFLICT(feed_id, guid) updates the mutable content columns but
+	// never the id, so a re-published item keeps its original identity —
+	// nor published, which is immutable after first insert: feed-supplied
+	// when parseable, else first-seen. A dateless item re-stamped with
+	// fetch time on every run could never age out of the display window;
+	// stability beats the rare legitimate date correction.
 	upStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO item
 		    (id, feed_id, guid, title, url, author, published, body_html,
@@ -111,7 +115,6 @@ func (s *ItemService) UpsertItems(ctx context.Context, items []*firehose.Item) e
 		    title        = excluded.title,
 		    url          = excluded.url,
 		    author       = excluded.author,
-		    published    = excluded.published,
 		    body_html    = excluded.body_html,
 		    summary_html = excluded.summary_html,
 		    lead_image   = excluded.lead_image,
