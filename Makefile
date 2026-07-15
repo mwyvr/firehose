@@ -80,5 +80,9 @@ force:
 	ssh -t $(HOST) 'sudo /usr/local/bin/firehose -force \
 		&& systemctl status firehose.service --no-pager -n 0'
 
+purge:
+	ssh -t $(HOST) 'sudo rm /var/lib/firehose/cache.db'
+	$(MAKE) bump
+	
 clean:
 	rm -rf bin build dist
