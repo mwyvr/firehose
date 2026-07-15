@@ -112,18 +112,7 @@ func (f *Fetcher) renderVoice(raw, summaryRaw, base string, strip []cascadia.Sel
 // publishedTime prefers the published stamp, falls back to updated, and
 // finally to the fetch time (an undated item is treated as new).
 func publishedTime(entry *gofeed.Item, now time.Time, loc *time.Location) time.Time {
-	switch {
-	case entry.PublishedParsed != nil:
-		return *entry.PublishedParsed
-	case entry.UpdatedParsed != nil:
-		return *entry.UpdatedParsed
-	}
-	// gofeed failed, but the raw strings survive: try the loose layouts
-	// (Govstack-style civic dates) before surrendering to fetch time.
-	if t, ok := parseLooseDate(entry.Published, loc); ok {
-		return t
-	}
-	if t, ok := parseLooseDate(entry.Updated, loc); ok {
+	if t, tier := resolvePublished(entry, loc); tier != DateNone {
 		return t
 	}
 	return now

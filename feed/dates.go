@@ -3,6 +3,8 @@ package feed
 import (
 	"strings"
 	"time"
+
+	"github.com/mmcdole/gofeed"
 )
 
 // Loose date parsing: a rescue pass for pubDate strings gofeed cannot parse.
@@ -36,4 +38,41 @@ func parseLooseDate(raw string, loc *time.Location) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// Date-resolution tiers, reported by resolvePublished and shown by
+// `firehose test` so a date-blind feed announces itself at onboarding
+// instead of days later as a "just now" ghost in the river.
+const (
+	DateFromFeed = "feed"    // gofeed parsed it (standard layouts)
+	DateRescued  = "rescued" // a loose layout matched, config timezone
+	DateNone     = ""        // no usable date: fetch-time fallback applies
+)
+
+// resolvePublished is the ONE definition of how an entry's published time
+// is determined: gofeed's parse, then the loose-layout rescue over the raw
+// strings. Returns the zero time with DateNone when nothing usable exists;
+// the pipeline substitutes fetch time, and the probe reports it loudly.
+func resolvePublished(entry *gofeed.Item, loc *time.Location) (time.Time, string) {
+	switch {
+	case entry.PublishedParsed != nil:
+		return *entry.PublishedParsed, DateFromFeed
+	case entry.UpdatedParsed != nil:
+		return *entry.UpdatedParsed, DateFromFeed
+	}
+	if t, ok := parseLooseDate(entry.Published, loc); ok {
+		return t, DateRescued
+	}
+	if t, ok := parseLooseDate(entry.Updated, loc); ok {
+		return t, DateRescued
+	}
+	return time.Time{}, DateNone
+}
+
+// rawDate returns the entry's raw date string for diagnostics.
+func rawDate(entry *gofeed.Item) string {
+	if entry.Published != "" {
+		return entry.Published
+	}
+	return entry.Updated
 }

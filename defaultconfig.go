@@ -125,7 +125,9 @@ categories = ["example"]
 # title           = "Override Title"    # wins over the feed's self-reported title
 # body            = "excerpt+expand"    # per-feed override
 # excerpt_image   = "lead"
-# user_agent      = "Mozilla/5.0 ..."   # per-feed UA override (CDN-hostile endpoints)
+# Per-feed UA override. Probe with and without when adding a new feed as some CDNs
+# block our honest robot UA, while others welcome it. firehose test | firehose test -ua "Mozilla..."
+# user_agent      = "Mozilla/5.0 ..."
 # headers         = { "Accept-Language" = "en-CA" }  # extra request headers
 # exclude         = ["sponsored"]       # drop items matching these keywords
 # include         = []                  # keep only matching items

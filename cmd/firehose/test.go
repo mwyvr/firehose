@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mwyvr/firehose"
 	"github.com/mwyvr/firehose/feed"
@@ -25,13 +26,15 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 	feedURL := fs.Arg(0)
 
 	fetchCfg := firehose.DefaultFetchConfig()
+	var loc *time.Location // config timezone for the loose-date rescue; nil = local
 	if cfg, err := firehose.LoadConfig(configPath); err == nil {
 		fetchCfg = cfg.Fetch
+		loc = cfg.Location
 	} else {
 		fmt.Fprintf(os.Stderr, "note: config not loaded (%v); using built-in fetch defaults\n", err)
 	}
 
-	preq := feed.ProbeRequest{URL: feedURL, UserAgent: *ua, Headers: hdrs.m}
+	preq := feed.ProbeRequest{URL: feedURL, UserAgent: *ua, Headers: hdrs.m, Location: loc}
 	effectiveUA := fetchCfg.UserAgent
 	if *ua != "" {
 		effectiveUA = *ua
@@ -70,13 +73,27 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 	}
 
 	fmt.Printf("\nparsed: %s %s — %q — %d items\n", p.FeedType, p.FeedVersion, p.FeedTitle, p.ItemCount)
+	if p.DatesRescued > 0 {
+		fmt.Printf("dates: %d of %d items rescued via loose layouts (config timezone)\n", p.DatesRescued, p.ItemCount)
+	}
+	if p.DatesUnparsed > 0 {
+		fmt.Printf("dates: %d of %d items have NO parseable date — those are stamped\n", p.DatesUnparsed, p.ItemCount)
+		fmt.Println("       with fetch time and may never age out of the display window")
+	}
 	if p.First != nil {
 		it := p.First
 		fmt.Println("first item:")
 		fmt.Printf("    title:     %s\n", it.Title)
 		fmt.Printf("    link:      %s\n", it.Link)
 		fmt.Printf("    guid:      %s\n", it.GUID)
-		fmt.Printf("    published: %s\n", it.Published)
+		switch it.PublishedTier {
+		case feed.DateFromFeed:
+			fmt.Printf("    published: %s\n", it.Published)
+		case feed.DateRescued:
+			fmt.Printf("    published: %s (rescued: loose layout, %s)\n", it.Published, it.Published.Location())
+		default:
+			fmt.Printf("    published: UNPARSED raw=%q\n", it.PublishedRaw)
+		}
 		if it.FullContent {
 			fmt.Println("    content:   full (content:encoded present) — excerpt+expand eligible")
 		} else {
