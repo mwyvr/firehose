@@ -63,23 +63,23 @@ func TestIncludeFilterSeesDescription(t *testing.T) {
 // TestURLFilters; note: linkless items cannot satisfy a URL keep-filter.
 func TestURLFilters(t *testing.T) {
 	fd := &firehose.Feed{IncludeURL: []string{"/west/"}}
-	if skipByURLFilters(fd, "https://w.example/parent_region/west/story-1.html") {
+	if skipByFilters(fd, "", "", "", "https://w.example/parent_region/west/story-1.html") {
 		t.Error("matching path must be kept")
 	}
-	if !skipByURLFilters(fd, "https://w.example/parent_region/east/story-2.html") {
+	if !skipByFilters(fd, "", "", "", "https://w.example/parent_region/east/story-2.html") {
 		t.Error("non-matching path must be dropped")
 	}
-	if !skipByURLFilters(fd, "") {
+	if !skipByFilters(fd, "", "", "", "") {
 		t.Error("linkless item cannot satisfy include_url")
 	}
 	fd2 := &firehose.Feed{ExcludeURL: []string{"/sponsored/"}}
-	if !skipByURLFilters(fd2, "https://w.example/sponsored/buy.html") {
+	if !skipByFilters(fd2, "", "", "", "https://w.example/sponsored/buy.html") {
 		t.Error("excluded path must be dropped")
 	}
-	if skipByURLFilters(fd2, "https://w.example/news/real.html") {
+	if skipByFilters(fd2, "", "", "", "https://w.example/news/real.html") {
 		t.Error("clean path wrongly dropped")
 	}
-	if skipByURLFilters(&firehose.Feed{}, "https://w.example/a") {
+	if skipByFilters(&firehose.Feed{}, "", "", "", "https://w.example/a") {
 		t.Error("no rules must be identity")
 	}
 }
@@ -111,5 +111,64 @@ func TestURLFiltersThroughPipeline(t *testing.T) {
 	}
 	if h.upserts[0][0].GUID != "a" {
 		t.Errorf("wrong survivor: %s", h.upserts[0][0].GUID)
+	}
+}
+
+// TestIncludeFamiliesComposeAsOR pins the multi-section publisher case:
+// a story's URL carries only its PRIMARY section, so a regional story
+// filed under a topic vertical matches by text while a text-pattern-free
+// story matches by path — either evidence keeps the item; neither drops
+// it; excludes still veto regardless.
+func TestIncludeFamiliesComposeAsOR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
+<item><guid>text-only</guid><title>Nurses talks begin</title><link>https://w.example/national/nurses-talks-begin.html</link>
+<description>WESTVILLE - Talks in West Province began Monday.</description>
+<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
+<item><guid>url-only</guid><title>Driver sentenced</title><link>https://w.example/parent_region/west/driver-sentenced.html</link>
+<description>SMALLTOWN - A driver was sentenced.</description>
+<pubDate>Mon, 13 Jul 2026 09:01:00 -0700</pubDate></item>
+<item><guid>neither</guid><title>Harvest outlook</title><link>https://w.example/parent_region/east/harvest.html</link>
+<description>EASTBURG - Crops improved.</description>
+<pubDate>Mon, 13 Jul 2026 09:02:00 -0700</pubDate></item>
+<item><guid>vetoed</guid><title>Sponsored: West Province deals</title><link>https://w.example/parent_region/west/deals.html</link>
+<description>WESTVILLE - Buy things.</description>
+<pubDate>Mon, 13 Jul 2026 09:03:00 -0700</pubDate></item>
+</channel></rss>`)
+	}))
+	defer srv.Close()
+
+	bare := &firehose.Feed{ID: 1, URL: srv.URL}
+	h := newHarness(t, []*firehose.Feed{bare})
+	h.fetcher.cfg.Feeds = []firehose.FeedConf{{
+		URL:        srv.URL,
+		Include:    []string{"West Province", "WESTVILLE"},
+		IncludeURL: []string{"/west/"},
+		Exclude:    []string{"sponsored"},
+	}}
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(h.upserts) != 1 {
+		t.Fatalf("want one batch, got %+v", h.upserts)
+	}
+	got := map[string]bool{}
+	for _, it := range h.upserts[0] {
+		got[it.GUID] = true
+	}
+	if !got["text-only"] {
+		t.Error("text evidence alone must keep (primary section /national/)")
+	}
+	if !got["url-only"] {
+		t.Error("URL evidence alone must keep (no text pattern)")
+	}
+	if got["neither"] {
+		t.Error("no evidence must drop")
+	}
+	if got["vetoed"] {
+		t.Error("exclude must veto even with both evidences present")
+	}
+	if len(got) != 2 {
+		t.Errorf("want exactly 2 survivors, got %v", got)
 	}
 }

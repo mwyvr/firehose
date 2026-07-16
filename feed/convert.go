@@ -53,12 +53,8 @@ func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cuto
 	}
 	clean, summary, words := f.renderVoice(raw, summaryRaw, base, strip)
 
-	if skipByFilters(fd, entry.Title, clean, summary) {
-		return nil
-	}
-
 	link := firehose.RewriteHost(entry.Link, fd.RewriteHost)
-	if skipByURLFilters(fd, link) {
+	if skipByFilters(fd, entry.Title, clean, summary, link) {
 		return nil
 	}
 
@@ -159,29 +155,39 @@ func entryAuthor(entry *gofeed.Item) string {
 	return ""
 }
 
-// skipByFilters applies the per-feed keyword filters: exclude drops an item
-// whose title or text matches any keyword; a non-empty include keeps only
-// matching items. Matching is case-insensitive substring.
-// title, description, body content are checked
-func skipByFilters(fd *firehose.Feed, title, bodyHTML, summaryHTML string) bool {
-	if len(fd.Exclude) == 0 && len(fd.Include) == 0 {
-		return false
-	}
+// skipByFilters decides whether an item is dropped.
+// excludes: vetos
+// includes: evidence (OR)
+func skipByFilters(fd *firehose.Feed, title, bodyHTML, summaryHTML, link string) bool {
 	hay := strings.ToLower(title + " " + textContent(bodyHTML) + " " + textContent(summaryHTML))
 	for _, kw := range fd.Exclude {
 		if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
 			return true
 		}
 	}
-	if len(fd.Include) > 0 {
-		for _, kw := range fd.Include {
-			if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
+	l := strings.ToLower(link)
+	for _, kw := range fd.ExcludeURL {
+		if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
+			return true
+		}
+	}
+
+	if len(fd.Include) == 0 && len(fd.IncludeURL) == 0 {
+		return false
+	}
+	for _, kw := range fd.Include {
+		if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
+			return false
+		}
+	}
+	if link != "" {
+		for _, kw := range fd.IncludeURL {
+			if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
 				return false
 			}
 		}
-		return true
 	}
-	return false
+	return true
 }
 
 // CheckConfig validates the feed-level parts of the config that only this
@@ -194,32 +200,4 @@ func CheckConfig(cfg *firehose.Config) error {
 		}
 	}
 	return nil
-}
-
-// skipByURLFilters is the URL-scoped sibling of skipByFilters, matching against
-// the item's final (post-rewrite) link — the publisher's taxonomy sometimes
-// lives in the path. keywords match path segments (an exclude of "news" would
-// drop every item under a /news/ path).
-func skipByURLFilters(fd *firehose.Feed, link string) bool {
-	if len(fd.ExcludeURL) == 0 && len(fd.IncludeURL) == 0 {
-		return false
-	}
-	l := strings.ToLower(link)
-	for _, kw := range fd.ExcludeURL {
-		if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
-			return true
-		}
-	}
-	if len(fd.IncludeURL) > 0 {
-		if link == "" {
-			return true // linkless items cannot satisfy a URL keep-filter
-		}
-		for _, kw := range fd.IncludeURL {
-			if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
 }
