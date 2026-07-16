@@ -14,13 +14,14 @@ import (
 // keyword filters produce nothing; one bad entry never affects its
 // neighbors.
 func (f *Fetcher) convert(fd *firehose.Feed, parsed *gofeed.Feed, now time.Time, strip []cascadia.SelectorGroup) []*firehose.Item {
+	loc := feedLocation(fd.Timezone)
 	cutoff := now.Add(-f.cfg.Settings.CacheRetention.D())
 	items := make([]*firehose.Item, 0, len(parsed.Items))
 	for _, entry := range parsed.Items {
 		if entry == nil {
 			continue
 		}
-		if item := f.itemFromEntry(fd, entry, now, cutoff, strip); item != nil {
+		if item := f.itemFromEntry(fd, entry, now, cutoff, strip, loc); item != nil {
 			items = append(items, item)
 		}
 	}
@@ -36,8 +37,8 @@ func (f *Fetcher) convert(fd *firehose.Feed, parsed *gofeed.Feed, now time.Time,
 // HTML); typography and highlight both refuse to touch code, which only
 // works on a parsed-and-normalized tree; filters match against the final
 // text a reader would see.
-func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cutoff time.Time, strip []cascadia.SelectorGroup) *firehose.Item {
-	published := publishedTime(entry, now)
+func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cutoff time.Time, strip []cascadia.SelectorGroup, loc *time.Location) *firehose.Item {
+	published := publishedTime(entry, now, loc)
 	if published.Before(cutoff) {
 		return nil // would be purged immediately; skip the work
 	}
@@ -113,8 +114,8 @@ func (f *Fetcher) renderVoice(raw, summaryRaw, base string, strip []cascadia.Sel
 
 // publishedTime prefers the published stamp, falls back to updated, and
 // finally to the fetch time (an undated item is treated as new).
-func publishedTime(entry *gofeed.Item, now time.Time) time.Time {
-	if t, tier := resolvePublished(entry); tier != DateNone {
+func publishedTime(entry *gofeed.Item, now time.Time, loc *time.Location) time.Time {
+	if t, tier := resolvePublished(entry, loc); tier != DateNone {
 		return t
 	}
 	return now

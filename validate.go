@@ -1,6 +1,9 @@
 package firehose
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // Validate checks the fully-defaulted config for internal consistency. Returns
 // the first problem as an EINVALID error. This is the core of `firehose check`.
@@ -89,6 +92,11 @@ func (c *Config) Validate() error {
 			return Errorf(EINVALID,
 				"feed %s: display_window %s exceeds cache_retention %s (items would be purged before they could render)",
 				fc.URL, fc.DisplayWindow.D(), c.Settings.CacheRetention.D())
+		}
+		if fc.Timezone != "" {
+			if _, err := time.LoadLocation(fc.Timezone); err != nil {
+				return Errorf(EINVALID, "feed %s: timezone %q: %v", fc.URL, fc.Timezone, err)
+			}
 		}
 	}
 

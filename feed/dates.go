@@ -9,7 +9,7 @@ import (
 
 // Loose date parsing: rescue layouts for pubDate strings gofeed cannot
 // parse (RFC822-shaped, full month name, no timezone). Zoneless input is
-// interpreted as UTC, matching gofeed's convention for standard layouts.
+// interpreted in the feed's timezone, UTC when unset.
 var looseDateLayouts = []string{
 	"Mon, 2 January 2006 15:04:05", // Govstack: full month, no zone
 	"Mon, 2 Jan 2006 15:04:05",     // abbreviated cousin, no zone
@@ -17,19 +17,32 @@ var looseDateLayouts = []string{
 	"2006-01-02 15:04:05",          // bare SQL-style timestamp
 }
 
-// parseLooseDate attempts the rescue layouts against a raw date string.
-// Zoneless input is UTC. Returns false if nothing matches.
-func parseLooseDate(raw string) (time.Time, bool) {
+// parseLooseDate attempts the rescue layouts against a raw date string,
+// interpreting zoneless input in loc. Returns false if nothing matches.
+func parseLooseDate(raw string, loc *time.Location) (time.Time, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return time.Time{}, false
 	}
 	for _, layout := range looseDateLayouts {
-		if t, err := time.ParseInLocation(layout, raw, time.UTC); err == nil {
+		if t, err := time.ParseInLocation(layout, raw, loc); err == nil {
 			return t, true
 		}
 	}
 	return time.Time{}, false
+}
+
+// feedLocation resolves a feed's timezone name; UTC when unset or invalid
+// (config validation rejects invalid names before a run).
+func feedLocation(tz string) *time.Location {
+	if tz == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 // Date-resolution tiers, reported by resolvePublished and shown by
@@ -45,17 +58,17 @@ const (
 // is determined: gofeed's parse, then the loose-layout rescue over the raw
 // strings. Returns the zero time with DateNone when nothing usable exists;
 // the pipeline substitutes fetch time, and the probe reports it loudly.
-func resolvePublished(entry *gofeed.Item) (time.Time, string) {
+func resolvePublished(entry *gofeed.Item, loc *time.Location) (time.Time, string) {
 	switch {
 	case entry.PublishedParsed != nil:
 		return *entry.PublishedParsed, DateFromFeed
 	case entry.UpdatedParsed != nil:
 		return *entry.UpdatedParsed, DateFromFeed
 	}
-	if t, ok := parseLooseDate(entry.Published); ok {
+	if t, ok := parseLooseDate(entry.Published, loc); ok {
 		return t, DateRescued
 	}
-	if t, ok := parseLooseDate(entry.Updated); ok {
+	if t, ok := parseLooseDate(entry.Updated, loc); ok {
 		return t, DateRescued
 	}
 	return time.Time{}, DateNone

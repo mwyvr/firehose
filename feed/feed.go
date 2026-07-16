@@ -134,6 +134,7 @@ func (f *Fetcher) Run(ctx context.Context) error {
 			fd.Headers = fc.Headers
 			fd.RewriteHost = fc.RewriteHost
 			fd.IncludeURL = fc.IncludeURL
+			fd.Timezone = fc.Timezone
 			fd.ExcludeURL = fc.ExcludeURL
 		}
 	}

@@ -135,6 +135,8 @@ categories = ["example"]
 # exclude         = ["sponsored"]       # drop items matching these keywords
 #                     # (include/exclude match title, body, and description)
 # include_url     = ["/west/"]          # include evidence from the link path
+# timezone        = "America/Edmonton"  # zone of zoneless dates in this feed
+#                     # (rescue parser only; display zone is settings.timezone)
 # exclude_url     = ["/sponsored/"]     # drop items whose link contains any
 #                     # excludes always drop; if any includes exist (text or
 #                     # URL), an item is kept when ANY of them matches (OR)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/mwyvr/firehose"
 )
@@ -170,5 +171,36 @@ func TestIncludeFamiliesComposeAsOR(t *testing.T) {
 	}
 	if len(got) != 2 {
 		t.Errorf("want exactly 2 survivors, got %v", got)
+	}
+}
+
+// TestFeedTimezoneThroughPipeline: a zoneless rescued date is interpreted
+// in the feed's configured timezone and stored as the equivalent UTC.
+func TestFeedTimezoneThroughPipeline(t *testing.T) {
+	if _, err := time.LoadLocation("America/Edmonton"); err != nil {
+		t.Skipf("no tzdata: %v", err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Town</title>
+<item><guid>a</guid><title>Notice</title><link>https://t.example/a</link>
+<description>A notice.</description>
+<pubDate>Mon, 13 July 2026 12:00:00</pubDate></item>
+</channel></rss>`)
+	}))
+	defer srv.Close()
+
+	bare := &firehose.Feed{ID: 1, URL: srv.URL}
+	h := newHarness(t, []*firehose.Feed{bare})
+	h.fetcher.cfg.Feeds = []firehose.FeedConf{{URL: srv.URL, Timezone: "America/Edmonton"}}
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(h.upserts) != 1 || len(h.upserts[0]) != 1 {
+		t.Fatalf("want one item, got %+v", h.upserts)
+	}
+	got := h.upserts[0][0].Published.UTC()
+	want := time.Date(2026, 7, 13, 18, 0, 0, 0, time.UTC) // noon MDT
+	if !got.Equal(want) {
+		t.Errorf("published = %v, want %v", got, want)
 	}
 }

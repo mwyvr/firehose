@@ -1,6 +1,8 @@
 package feed
 
 import (
+	_ "time/tzdata"
+
 	"context"
 	"fmt"
 	"net/http"
@@ -26,7 +28,7 @@ func TestParseLooseDateGovstack(t *testing.T) {
 		{"Fri, 12 December 2025 23:00:00", time.Date(2025, 12, 12, 23, 0, 0, 0, time.UTC)},
 	}
 	for _, tc := range cases {
-		got, ok := parseLooseDate(tc.raw)
+		got, ok := parseLooseDate(tc.raw, time.UTC)
 		if !ok {
 			t.Errorf("%q: not parsed", tc.raw)
 			continue
@@ -35,10 +37,10 @@ func TestParseLooseDateGovstack(t *testing.T) {
 			t.Errorf("%q: got %v want %v", tc.raw, got, tc.want)
 		}
 	}
-	if _, ok := parseLooseDate("not a date at all"); ok {
+	if _, ok := parseLooseDate("not a date at all", time.UTC); ok {
 		t.Error("garbage must not parse")
 	}
-	if _, ok := parseLooseDate(""); ok {
+	if _, ok := parseLooseDate("", time.UTC); ok {
 		t.Error("empty must not parse")
 	}
 }
@@ -92,7 +94,7 @@ func TestResolvePublishedTiers(t *testing.T) {
 		p := &Probe{}
 		body := `<rss version="2.0"><channel><title>T</title><item><title>X</title>` +
 			`<link>https://x.example/a</link>` + tc.body + `</item></channel></rss>`
-		if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed"); err != nil {
+		if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed", ""); err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
 		if p.First == nil || p.First.PublishedTier != tc.tier {
@@ -112,7 +114,7 @@ func TestProbeDateStats(t *testing.T) {
 <item><title>D</title><link>https://x.example/d</link></item>
 </channel></rss>`
 	p := &Probe{}
-	if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed"); err != nil {
+	if _, err := analyzeProbeBody(p, []byte(body), "https://x.example/feed", ""); err != nil {
 		t.Fatal(err)
 	}
 	if p.DatesFeed != 1 || p.DatesRescued != 1 || p.DatesUnparsed != 2 {
@@ -121,5 +123,33 @@ func TestProbeDateStats(t *testing.T) {
 	}
 	if p.First.PublishedRaw == "" {
 		t.Error("first item's raw date string must be captured for diagnostics")
+	}
+}
+
+// TestParseLooseDateInLocation pins timezone-aware rescue: the same
+// zoneless string lands differently by zone, and DST is honored (a July
+// date in a DST zone differs from a January one).
+func TestParseLooseDateInLocation(t *testing.T) {
+	edm, err := time.LoadLocation("America/Edmonton")
+	if err != nil {
+		t.Skipf("no tzdata: %v", err)
+	}
+	july, ok := parseLooseDate("Mon, 13 July 2026 12:00:00", edm)
+	if !ok {
+		t.Fatal("rescue failed")
+	}
+	if got := july.UTC().Hour(); got != 18 { // MDT = UTC-6
+		t.Errorf("July noon Edmonton = %d UTC, want 18", got)
+	}
+	jan, ok := parseLooseDate("Mon, 12 January 2026 12:00:00", edm)
+	if !ok {
+		t.Fatal("rescue failed")
+	}
+	if got := jan.UTC().Hour(); got != 19 { // MST = UTC-7
+		t.Errorf("January noon Edmonton = %d UTC, want 19", got)
+	}
+	utc, _ := parseLooseDate("Mon, 13 July 2026 12:00:00", time.UTC)
+	if utc.Hour() != 12 {
+		t.Errorf("UTC parse moved: %v", utc)
 	}
 }

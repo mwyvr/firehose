@@ -100,3 +100,24 @@ theme = "sepia"
 		})
 	}
 }
+
+func TestFeedTimezoneValidated(t *testing.T) {
+	bad := `
+[[feed]]
+url = "https://x.example/feed"
+timezone = "Mars/Olympus"
+
+[[output]]
+name = "all"
+file = "index.html"
+categories = ["*"]
+`
+	_, err := LoadConfig(writeConfig(t, bad))
+	if ErrorCode(err) != EINVALID || !strings.Contains(err.Error(), "timezone") {
+		t.Fatalf("want EINVALID naming timezone, got %v", err)
+	}
+	good := strings.Replace(bad, "Mars/Olympus", "America/Edmonton", 1)
+	if _, err := LoadConfig(writeConfig(t, good)); err != nil {
+		t.Fatalf("valid feed timezone rejected: %v", err)
+	}
+}

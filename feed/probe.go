@@ -20,6 +20,7 @@ type Probe struct {
 	FinalURL       string
 	Hops           []ProbeHop // redirect chain, in order
 	ChainPermanent bool       // every hop 301/308: a real fetch would persist FinalURL
+	Timezone       string     // zone assumed for zoneless rescued dates
 
 	Status       int
 	Proto        string // negotiated protocol (expect HTTP/1.1 by design)
@@ -73,6 +74,7 @@ type ProbeRequest struct {
 	URL       string
 	UserAgent string            // overrides fetch.UserAgent when set
 	Headers   map[string]string // set verbatim, last
+	Timezone  string            // zone for zoneless rescued dates; UTC when unset
 }
 
 // RunProbe fetches and analyses a single feed URL with the configured fetch
@@ -82,9 +84,15 @@ type ProbeRequest struct {
 func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest) (*Probe, error) {
 	feedURL := preq.URL
 	p := &Probe{RequestURL: feedURL, FinalURL: feedURL}
+	if preq.Timezone != "" {
+		if _, err := time.LoadLocation(preq.Timezone); err != nil {
+			return p, firehose.Errorf(firehose.EINVALID, "bad timezone %q: %v", preq.Timezone, err)
+		}
+	}
+	p.Timezone = feedLocation(preq.Timezone).String()
 
 	if firehose.IsLocalFeed(feedURL) {
-		return probeLocal(p, feedURL)
+		return probeLocal(p, feedURL, preq.Timezone)
 	}
 
 	fd := &firehose.Feed{URL: feedURL, UserAgent: preq.UserAgent, Headers: preq.Headers}
@@ -128,7 +136,7 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 		return p, firehose.Errorf(code, "HTTP %d", resp.StatusCode)
 	}
 
-	return analyzeProbeBody(p, body, feedURL)
+	return analyzeProbeBody(p, body, feedURL, preq.Timezone)
 }
 
 func snippet(body []byte) string {
@@ -142,7 +150,8 @@ func snippet(body []byte) string {
 // analyzeProbeBody is the transport-independent half of a probe: parse the
 // document and report type, item count, and the first-item analysis. Shared
 // by the network and file:// paths.
-func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
+func analyzeProbeBody(p *Probe, body []byte, feedURL, tz string) (*Probe, error) {
+	loc := feedLocation(tz)
 	parsed, err := gofeed.NewParser().ParseString(string(body))
 	if err != nil {
 		p.BodySnippet = snippet(body)
@@ -158,7 +167,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 		if it == nil {
 			continue
 		}
-		switch _, tier := resolvePublished(it); tier {
+		switch _, tier := resolvePublished(it, loc); tier {
 		case DateFromFeed:
 			p.DatesFeed++
 		case DateRescued:
@@ -181,7 +190,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 		}
 		clean, words := sanitize(raw, base, nil)
 		lead := firstImgSrc(clean)
-		published, tier := resolvePublished(it)
+		published, tier := resolvePublished(it, loc)
 		p.First = &ProbeItem{
 			Title:         it.Title,
 			Link:          it.Link,
@@ -198,7 +207,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 }
 
 // probeLocal is `firehose test` for a file:// feed
-func probeLocal(p *Probe, feedURL string) (*Probe, error) {
+func probeLocal(p *Probe, feedURL, tz string) (*Probe, error) {
 	path := firehose.LocalFeedPath(feedURL)
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -220,5 +229,5 @@ func probeLocal(p *Probe, feedURL string) (*Probe, error) {
 		return p, firehose.Errorf(firehose.EINTERNAL, "read: %v", err)
 	}
 	p.BodyBytes = len(body)
-	return analyzeProbeBody(p, body, feedURL)
+	return analyzeProbeBody(p, body, feedURL, tz)
 }

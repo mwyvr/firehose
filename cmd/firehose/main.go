@@ -8,6 +8,8 @@
 package main
 
 import (
+	_ "time/tzdata" // static binaries resolve IANA names without host tzdata
+
 	"context"
 	"errors"
 	"flag"

@@ -14,6 +14,7 @@ import (
 func runTest(ctx context.Context, configPath string, args []string) error {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	ua := fs.String("ua", "", "override User-Agent for this probe")
+	tz := fs.String("tz", "", "IANA timezone assumed for zoneless dates (default UTC)")
 	var hdrs headerFlags
 	fs.Var(&hdrs, "H", `extra header, "Key: Value" (repeatable)`)
 	if err := fs.Parse(args); err != nil {
@@ -31,7 +32,7 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 		fmt.Fprintf(os.Stderr, "note: config not loaded (%v); using built-in fetch defaults\n", err)
 	}
 
-	preq := feed.ProbeRequest{URL: feedURL, UserAgent: *ua, Headers: hdrs.m}
+	preq := feed.ProbeRequest{URL: feedURL, UserAgent: *ua, Headers: hdrs.m, Timezone: *tz}
 	effectiveUA := fetchCfg.UserAgent
 	if *ua != "" {
 		effectiveUA = *ua
@@ -74,7 +75,7 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 
 	fmt.Printf("\nparsed: %s %s — %q — %d items\n", p.FeedType, p.FeedVersion, p.FeedTitle, p.ItemCount)
 	if p.DatesRescued > 0 {
-		fmt.Printf("dates: %d of %d items rescued via loose layouts (zoneless = UTC)\n", p.DatesRescued, p.ItemCount)
+		fmt.Printf("dates: %d of %d items rescued via loose layouts (zoneless = %s)\n", p.DatesRescued, p.ItemCount, p.Timezone)
 	}
 	if p.DatesUnparsed > 0 {
 		fmt.Printf("dates: %d of %d items have NO parseable date — those are stamped\n", p.DatesUnparsed, p.ItemCount)
@@ -90,7 +91,7 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 		case feed.DateFromFeed:
 			fmt.Printf("    published: %s\n", it.Published)
 		case feed.DateRescued:
-			fmt.Printf("    published: %s (rescued: loose layout, UTC assumed)\n", it.Published)
+			fmt.Printf("    published: %s (rescued: loose layout, %s assumed)\n", it.Published, p.Timezone)
 		default:
 			fmt.Printf("    published: UNPARSED raw=%q\n", it.PublishedRaw)
 		}
