@@ -95,18 +95,18 @@ func selectBody(entry *gofeed.Item) (raw, summaryRaw string, fullContent bool) {
 // policy), then typography normalization, then declared-language
 // highlighting. Word count is measured on the sanitized body.
 func (f *Fetcher) renderVoice(raw, summaryRaw, base string, strip []cascadia.SelectorGroup) (clean, summary string, words int) {
-	clean, words = Sanitize(raw, base, strip)
+	clean, words = sanitize(raw, base, strip)
 	if summaryRaw != "" {
-		summary, _ = Sanitize(summaryRaw, base, strip)
+		summary, _ = sanitize(summaryRaw, base, strip)
 	}
 	if f.cfg.Settings.Typography {
-		clean = NormalizeTypography(clean)
+		clean = normalizeTypography(clean)
 		if summary != "" {
-			summary = NormalizeTypography(summary)
+			summary = normalizeTypography(summary)
 		}
 	}
 	if f.cfg.Settings.Highlight {
-		clean = Highlight(clean)
+		clean = highlight(clean)
 	}
 	return clean, summary, words
 }
@@ -153,51 +153,4 @@ func entryAuthor(entry *gofeed.Item) string {
 		return entry.Authors[0].Name
 	}
 	return ""
-}
-
-// skipByFilters decides whether an item is dropped.
-// excludes: vetos
-// includes: evidence (OR)
-func skipByFilters(fd *firehose.Feed, title, bodyHTML, summaryHTML, link string) bool {
-	hay := strings.ToLower(title + " " + textContent(bodyHTML) + " " + textContent(summaryHTML))
-	for _, kw := range fd.Exclude {
-		if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
-			return true
-		}
-	}
-	l := strings.ToLower(link)
-	for _, kw := range fd.ExcludeURL {
-		if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
-			return true
-		}
-	}
-
-	if len(fd.Include) == 0 && len(fd.IncludeURL) == 0 {
-		return false
-	}
-	for _, kw := range fd.Include {
-		if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
-			return false
-		}
-	}
-	if link != "" {
-		for _, kw := range fd.IncludeURL {
-			if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// CheckConfig validates the feed-level parts of the config that only this
-// package can check (strip selectors compile). Called by `firehose check`.
-func CheckConfig(cfg *firehose.Config) error {
-	for _, fc := range cfg.Feeds {
-		if _, err := CompileStrip(fc.StripSelectors); err != nil {
-			return firehose.Errorf(firehose.EINVALID,
-				"feed %s: strip_selectors: %v", fc.URL, err)
-		}
-	}
-	return nil
 }

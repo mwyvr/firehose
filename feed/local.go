@@ -45,7 +45,7 @@ func (f *Fetcher) fetchLocal(fd *firehose.Feed) (res result) {
 		return res
 	}
 
-	strip, err := CompileStrip(fd.StripSelectors)
+	strip, err := compileStrip(fd.StripSelectors)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINVALID)
 		return res

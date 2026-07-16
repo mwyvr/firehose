@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// DefaultFetchConfig returns the built-in fetch settings, used also for tools
-// that do not depend on a live config file, such as `firehose test...`
+// DefaultConfig returns the built-in configuration that a config file
+// decodes over.
 func DefaultConfig() *Config {
 	return &Config{
 		Settings: Settings{
@@ -26,7 +26,7 @@ func DefaultConfig() *Config {
 		Fonts: FontConfig{
 			ContentFamily: defaultContentFamily,
 			ChromeFamily:  defaultChromeFamily,
-			// CSSURL deliberately unset: whether the remote default applies
+			// CSSURL left unset: whether the remote default applies
 			// depends on whether self-hosted sources are configured. See
 			// Config.FontsCSSURL.
 		},
@@ -34,6 +34,8 @@ func DefaultConfig() *Config {
 	}
 }
 
+// DefaultFetchConfig returns built-in fetch settings for tools that run
+// without a config file (firehose test).
 func DefaultFetchConfig() FetchConfig {
 	return FetchConfig{
 		Concurrency:    defaultConcurrency,

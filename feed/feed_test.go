@@ -286,7 +286,7 @@ func TestSanitize(t *testing.T) {
 		`<pre><code class="language-go">x := "don't touch"</code></pre>` +
 		`<iframe src="https://tracker.example"></iframe>`
 
-	clean, words := Sanitize(raw, "https://blog.example/posts/1", nil)
+	clean, words := sanitize(raw, "https://blog.example/posts/1", nil)
 
 	for _, banned := range []string{"style=", "onclick", "<script", "<iframe", "wp-image"} {
 		if strings.Contains(clean, banned) {
@@ -314,37 +314,37 @@ func TestSanitize(t *testing.T) {
 }
 
 func TestSanitizeEmptyAndGarbageBase(t *testing.T) {
-	if clean, words := Sanitize("", "https://x.example/", nil); clean != "" || words != 0 {
+	if clean, words := sanitize("", "https://x.example/", nil); clean != "" || words != 0 {
 		t.Errorf("empty input: %q %d", clean, words)
 	}
 	// Unparseable/relative base: links stay as-is but sanitization still runs.
-	clean, _ := Sanitize(`<p onclick="x">hi <a href="/rel">r</a></p>`, "not a url", nil)
+	clean, _ := sanitize(`<p onclick="x">hi <a href="/rel">r</a></p>`, "not a url", nil)
 	if strings.Contains(clean, "onclick") {
 		t.Errorf("sanitization must not depend on base URL: %s", clean)
 	}
 }
 
 func TestStripSelectors(t *testing.T) {
-	strip, err := CompileStrip([]string{"div.sharedaddy", "p.boiler"})
+	strip, err := compileStrip([]string{"div.sharedaddy", "p.boiler"})
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
 	raw := `<p>keep me</p><div class="sharedaddy"><p>share junk</p></div><p class="boiler">subscribe!</p>`
-	clean, _ := Sanitize(raw, "https://x.example/a", strip)
+	clean, _ := sanitize(raw, "https://x.example/a", strip)
 	if strings.Contains(clean, "share junk") || strings.Contains(clean, "subscribe!") {
 		t.Errorf("strip selectors not applied: %s", clean)
 	}
 	if !strings.Contains(clean, "keep me") {
 		t.Errorf("kept content lost: %s", clean)
 	}
-	if _, err := CompileStrip([]string{"div[unclosed"}); err == nil {
+	if _, err := compileStrip([]string{"div[unclosed"}); err == nil {
 		t.Error("invalid selector must fail compilation")
 	}
 }
 
 func TestNormalizeTypography(t *testing.T) {
 	in := `<p>"Hello," she said -- it's a 'test'... done</p><pre><code>x = "raw" -- 'code'...</code></pre>`
-	out := NormalizeTypography(in)
+	out := normalizeTypography(in)
 	for _, want := range []string{
 		"\u201cHello,\u201d", // curly doubles
 		"\u2014",             // em dash
@@ -368,18 +368,18 @@ func TestNormalizeTypography(t *testing.T) {
 
 func TestHighlightDeclaredLanguageOnly(t *testing.T) {
 	declared := `<pre><code class="language-go">package main</code></pre>`
-	out := Highlight(declared)
+	out := highlight(declared)
 	if !strings.Contains(out, "chroma") || !strings.Contains(out, "<span") {
 		t.Errorf("declared language not highlighted: %s", out)
 	}
 
 	plain := `<pre><code>mystery(); code--here</code></pre>`
-	if got := Highlight(plain); got != plain {
+	if got := highlight(plain); got != plain {
 		t.Errorf("undeclared code must stay plain (never guess): %s", got)
 	}
 
 	unknown := `<pre><code class="language-nosuchlang">???</code></pre>`
-	if got := Highlight(unknown); strings.Contains(got, "<span") {
+	if got := highlight(unknown); strings.Contains(got, "<span") {
 		t.Errorf("unknown declared language must stay plain: %s", got)
 	}
 }
@@ -580,5 +580,81 @@ func TestFetchAllItemsAgedOutDoesNotStampLastSuccess(t *testing.T) {
 	}
 	if len(h.upserts) != 0 {
 		t.Errorf("nothing should be stored, got %v", h.upserts)
+	}
+}
+
+// TestProbeSendsFetcherHeaders asserts the probe and the fetcher present
+// identical User-Agent, Accept, and Accept-Language headers.
+func TestProbeSendsFetcherHeaders(t *testing.T) {
+	type got struct{ ua, accept, al string }
+	capture := func(r *http.Request) got {
+		return got{r.Header.Get("User-Agent"), r.Header.Get("Accept"), r.Header.Get("Accept-Language")}
+	}
+	var probeGot, fetchGot got
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/probe" {
+			probeGot = capture(r)
+		} else {
+			fetchGot = capture(r)
+		}
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>T</title></channel></rss>`)
+	}))
+	defer srv.Close()
+
+	cfg := testConfig()
+	cfg.Fetch.AcceptLanguage = "en"
+	if _, err := RunProbe(context.Background(), cfg.Fetch, ProbeRequest{URL: srv.URL + "/probe"}); err != nil {
+		t.Fatalf("probe: %v", err)
+	}
+	h := newHarness(t, []*firehose.Feed{{ID: 1, URL: srv.URL + "/fetch"}})
+	h.fetcher.cfg.Fetch.AcceptLanguage = "en"
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if probeGot != fetchGot {
+		t.Errorf("probe headers diverge from fetcher: probe=%+v fetch=%+v", probeGot, fetchGot)
+	}
+	if probeGot.accept == "" || probeGot.al == "" {
+		t.Errorf("politeness headers missing: %+v", probeGot)
+	}
+}
+
+// TestProbeChainPermanentVerdict asserts ChainPermanent is true only for
+// an end-to-end permanent redirect chain.
+func TestProbeChainPermanentVerdict(t *testing.T) {
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	mux.HandleFunc("/perm", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, srv.URL+"/final", http.StatusPermanentRedirect)
+	})
+	mux.HandleFunc("/temp", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, srv.URL+"/final", http.StatusFound)
+	})
+	mux.HandleFunc("/final", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>T</title></channel></rss>`)
+	})
+
+	cfg := testConfig()
+	p, err := RunProbe(context.Background(), cfg.Fetch, ProbeRequest{URL: srv.URL + "/perm"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !p.ChainPermanent {
+		t.Error("308 chain must report ChainPermanent")
+	}
+	p, err = RunProbe(context.Background(), cfg.Fetch, ProbeRequest{URL: srv.URL + "/temp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ChainPermanent {
+		t.Error("302 chain must not report ChainPermanent")
+	}
+	p, err = RunProbe(context.Background(), cfg.Fetch, ProbeRequest{URL: srv.URL + "/final"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ChainPermanent {
+		t.Error("no redirects must not report ChainPermanent")
 	}
 }

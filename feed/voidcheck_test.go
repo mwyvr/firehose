@@ -6,7 +6,7 @@ import (
 )
 
 func TestSanitizeCanonicalVoids(t *testing.T) {
-	clean, _ := Sanitize(`<p>a<br/>b<br>c</p><hr/>`, "https://x.example/", nil)
+	clean, _ := sanitize(`<p>a<br/>b<br>c</p><hr/>`, "https://x.example/", nil)
 	if strings.Contains(clean, "/>") {
 		t.Fatalf("self-closing void survived: %s", clean)
 	}

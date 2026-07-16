@@ -85,8 +85,8 @@ func prefixSelectors(css, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-// fontsView is what the stylesheet template sees: the fonts config with the
-// remote URL already resolved (Config.FontsCSSURL).
+// fontsCtx is the stylesheet template's context: FontConfig plus the
+// resolved remote URL.
 type fontsCtx struct {
 	firehose.FontConfig
 	CSSURL string

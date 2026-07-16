@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -22,7 +23,7 @@ func runGenerate(ctx context.Context, configPath string, force bool) (err error)
 					fmt.Fprintf(os.Stderr, "firehose: fallback health write failed: %v\n", werr)
 				}
 			}
-			err = fmt.Errorf("%s", msg)
+			err = errors.New(msg)
 		}
 	}()
 

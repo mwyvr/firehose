@@ -8,12 +8,9 @@ import (
 	"github.com/mwyvr/firehose"
 )
 
-// Cross-feed dedupe: the same story arriving via multiple feeds (BC Gov
-// repeats releases across every ministry feed; CBC's sections overlap)
-// renders once per page. Identity is the CANONICAL item URL — exact match
-// after tracker-stripping, never fuzzy similarity: "same coverage by two
-// outlets" is clustering, permanently out of scope. Items without a URL are
-// never deduped (no identity).
+// Cross-feed dedupe: the same story arriving via multiple feeds renders
+// once per page. Identity is the canonical item URL (exact match after
+// tracker-stripping); items without a URL are never deduped.
 
 // trackerParams are query parameters that identify the click, not the
 // content. Matched case-insensitively; utm_* matches by prefix.
@@ -22,12 +19,10 @@ var trackerParams = map[string]bool{
 	"igshid": true, "mc_cid": true, "mc_eid": true,
 }
 
-// canonicalItemURL normalizes an item URL to its content identity:
-// lowercased scheme and host, fragment dropped, tracker params removed with
-// the remaining query preserved in original order. Unparseable input is
-// returned as-is (identity = the raw string). Deliberately conservative:
-// trailing slashes and http/https are preserved — a false merge is worse
-// than a missed one.
+// canonicalItemURL normalizes an item URL: lowercased scheme and host,
+// fragment dropped, tracker params removed, remaining query preserved in
+// order. Trailing slashes and scheme are significant; unparseable input
+// is returned as-is.
 func canonicalItemURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
@@ -55,11 +50,10 @@ func canonicalItemURL(raw string) string {
 	return u.String()
 }
 
-// dedupeItems collapses duplicates in a newest-first item slice. The winner
-// per canonical URL: full content beats a teaser, then earliest published
-// (the origin over the echo), then config feed order. Returns the kept
-// items in their original river order and, per kept item, the OTHER source
-// titles ("also via"), in config feed order.
+// dedupeItems collapses duplicates in a newest-first slice. Winner per
+// canonical URL: full content, then earliest published, then config feed
+// order. Returns kept items in original order and, per kept item, the
+// other source titles in config feed order.
 func dedupeItems(items []*firehose.Item, meta map[int64]feedMeta, feedOrder map[int64]int) ([]*firehose.Item, map[*firehose.Item][]string) {
 	groups := map[string][]*firehose.Item{}
 	for _, it := range items {

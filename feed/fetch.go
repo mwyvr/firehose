@@ -43,7 +43,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 		return res
 	}
 
-	resp, redirect, err := f.doFollow(req)
+	resp, redirect, err := doFollow(f.client, req)
 	if err != nil {
 		res.upd = f.failure(fd, classifyNetErr(err))
 		return res
@@ -75,7 +75,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 		return res
 	}
 
-	strip, err := CompileStrip(fd.StripSelectors)
+	strip, err := compileStrip(fd.StripSelectors)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINVALID)
 		return res
@@ -105,25 +105,34 @@ func (f *Fetcher) lockHost(rawURL string) func() {
 	return mu.(*sync.Mutex).Unlock
 }
 
-// buildRequest assembles the polite conditional GET: global or per-feed
-// User-Agent, Accept (Go sends none by default — a CDN bot tell),
-// Accept-Language, per-feed header overrides, then the cache validators.
-func (f *Fetcher) buildRequest(ctx context.Context, fd *firehose.Feed) (*http.Request, error) {
+// buildFeedRequest assembles the polite GET shared by fetches and probes:
+// global or per-feed User-Agent, Accept, Accept-Language, per-feed header
+// overrides.
+func buildFeedRequest(ctx context.Context, fetch firehose.FetchConfig, fd *firehose.Feed) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fd.URL, nil)
 	if err != nil {
 		return nil, err
 	}
-	ua := f.cfg.Fetch.UserAgent
+	ua := fetch.UserAgent
 	if fd.UserAgent != "" {
 		ua = fd.UserAgent
 	}
 	req.Header.Set("User-Agent", ua)
 	req.Header.Set("Accept", acceptHeader)
-	if al := f.cfg.Fetch.AcceptLanguage; al != "" {
+	if al := fetch.AcceptLanguage; al != "" {
 		req.Header.Set("Accept-Language", al)
 	}
 	for k, v := range fd.Headers {
 		req.Header.Set(k, v)
+	}
+	return req, nil
+}
+
+// buildRequest adds the cache validators to the shared request.
+func (f *Fetcher) buildRequest(ctx context.Context, fd *firehose.Feed) (*http.Request, error) {
+	req, err := buildFeedRequest(ctx, f.cfg.Fetch, fd)
+	if err != nil {
+		return nil, err
 	}
 	if fd.ETag != "" {
 		req.Header.Set("If-None-Match", fd.ETag)
@@ -134,19 +143,26 @@ func (f *Fetcher) buildRequest(ctx context.Context, fd *firehose.Feed) (*http.Re
 	return req, nil
 }
 
-// redirectTrace records what following redirects learned: only a chain that
-// was permanent END TO END (301/308 every hop) justifies persisting the new
-// URL; any temporary hop breaks it.
+// redirectHop is one followed redirect.
+type redirectHop struct {
+	Status int
+	To     string
+}
+
+// redirectTrace records what following redirects learned: hops in order,
+// the final URL, and whether every hop was permanent (301/308) — only an
+// end-to-end permanent chain justifies persisting the new URL.
 type redirectTrace struct {
 	allPermanent bool
 	finalURL     string
+	hops         []redirectHop
 }
 
-// doFollow performs the request with a per-fetch client copy whose redirect
-// hook fills the trace.
-func (f *Fetcher) doFollow(req *http.Request) (*http.Response, redirectTrace, error) {
+// doFollow performs the request with a copy of base whose redirect hook
+// fills the trace.
+func doFollow(base *http.Client, req *http.Request) (*http.Response, redirectTrace, error) {
 	trace := redirectTrace{allPermanent: true}
-	client := *f.client
+	client := *base
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
 			return fmt.Errorf("stopped after 10 redirects")
@@ -158,6 +174,7 @@ func (f *Fetcher) doFollow(req *http.Request) (*http.Response, redirectTrace, er
 			trace.allPermanent = false
 		}
 		trace.finalURL = req.URL.String()
+		trace.hops = append(trace.hops, redirectHop{Status: req.Response.StatusCode, To: req.URL.String()})
 		return nil
 	}
 	resp, err := client.Do(req)
@@ -190,12 +207,10 @@ func persistSelfTitle(upd *firehose.FeedUpdate, fd *firehose.Feed, parsed *gofee
 	}
 }
 
-// success builds the feed update for a successful contact: failure state
-// reset, fetch stamped, backoff gate cleared. producedItems means the fetch
-// yielded STORABLE items — a parse whose entries all fell to the retention
-// gate or filters does not stamp LastSuccess, so the health page's
-// quiet-feed detection sees through "parses fine, yields nothing". A 304
-// never stamps it.
+// success builds the update for a successful contact: failures reset,
+// fetch stamped, backoff cleared. producedItems gates LastSuccess: only
+// fetches that yielded storable items stamp it (a 304 or a fully gated
+// parse does not).
 func success(now time.Time, producedItems bool) firehose.FeedUpdate {
 	zero := 0
 	empty := ""
@@ -227,8 +242,8 @@ func (f *Fetcher) failure(fd *firehose.Feed, code string) firehose.FeedUpdate {
 	}
 }
 
-// persistRedirect records the final URL when the whole redirect chain was
-// permanent — a 301 means "stop asking here", so we stop asking there.
+// persistRedirect stores the final URL when every redirect hop was
+// permanent.
 func persistRedirect(upd *firehose.FeedUpdate, fd *firehose.Feed, allPermanent bool, finalURL string) {
 	if allPermanent && finalURL != "" && finalURL != fd.URL {
 		upd.URL = &finalURL

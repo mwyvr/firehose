@@ -11,12 +11,12 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-// NormalizeTypography applies firehose's "one voice" intent to text: straight
+// normalizeTypography applies firehose's "one voice" intent to text: straight
 // quotes become curly, "--"/"---" become em dashes, "..." becomes an
 // ellipsis. It operates on text nodes only and never descends into <pre> or
 // <code> — the cross-cutting rule; curling a quote inside a program corrupts
 // it. Toggleable via settings.typography.
-func NormalizeTypography(fragment string) string {
+func normalizeTypography(fragment string) string {
 	if fragment == "" {
 		return fragment
 	}

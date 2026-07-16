@@ -47,6 +47,9 @@ func runTest(ctx context.Context, configPath string, args []string) error {
 	for _, hop := range p.Hops {
 		fmt.Printf("    -> %d %s\n", hop.Status, hop.To)
 	}
+	if p.ChainPermanent {
+		fmt.Println("    chain permanent: a real fetch would persist the final URL")
+	}
 	if p.Status != 0 {
 		fmt.Printf("status: %d\n", p.Status)
 		printIf("proto", p.Proto)

@@ -7,17 +7,9 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-// Loose date parsing: a rescue pass for pubDate strings gofeed cannot parse.
-// Noted with a civic CMS platforms (Govstack) that emits RFC822-shaped dates
-// with a FULL month name and NO timezone — "Tue, 14 July 2026 23:00:00" — which
-// no standard layout accepts.
-//
-// Zoneless timestamps are interpreted as UTC — matching gofeed's own
-// convention for zoneless standard layouts, so both tiers agree. Live
-// evidence: Govstack emits zoneless UTC (an item published 16:00 MST
-// carries pubDate 23:00:00). If a CMS that publishes zoneless LOCAL time
-// ever appears, a per-feed override is the escape hatch, not a different
-// default.
+// Loose date parsing: rescue layouts for pubDate strings gofeed cannot
+// parse (RFC822-shaped, full month name, no timezone). Zoneless input is
+// interpreted as UTC, matching gofeed's convention for standard layouts.
 var looseDateLayouts = []string{
 	"Mon, 2 January 2006 15:04:05", // Govstack: full month, no zone
 	"Mon, 2 Jan 2006 15:04:05",     // abbreviated cousin, no zone

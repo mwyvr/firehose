@@ -5,18 +5,10 @@ import (
 	"strings"
 )
 
-// Per-feed host rewriting: some syndicated CMSes emit another site's
-// hostname in item links and GUIDs (a local outlet's feed carrying the
-// parent network's domain), leaving every link a 404. The fix is
-// declarative, per feed:
-//
-//	rewrite_host = { "wrong.example" = "right.example" }
-//
-// A key matches itself and its subdomains (the apex form covers www);
-// matching is case-insensitive; only the host component is replaced —
-// scheme, path, and query pass through untouched. Values are bare
-// hostnames (validated). Strings that don't parse as URLs with a host
-// (opaque GUIDs) are returned unchanged.
+// Per-feed host rewriting for feeds that emit another site's hostname in
+// item links and GUIDs. A key matches itself and its subdomains; matching
+// is case-insensitive; only the host component is replaced. Strings that
+// don't parse as URLs with a host are returned unchanged.
 
 // RewriteHost applies host-rewrite rules to a URL string. Unmatched or
 // unparseable input is returned as-is.

@@ -60,15 +60,14 @@ func (it *Item) ReadingTime() time.Duration {
 // template renders the title as plain text rather than a dead anchor.
 func (it *Item) HasLink() bool { return it.URL != "" }
 
-// ItemFilter narrows which items render into a given output. A section IS a
-// filter — this is the WTF XxxFilter idiom, and it is the whole section
-// mechanism. The ALL river is an ItemFilter with empty Categories.
 // ItemStat is the health page's view of one cached item.
 type ItemStat struct {
 	FeedID    int64
 	Published time.Time
 }
 
+// ItemFilter narrows which items render into an output; a section is a
+// filter, and the ALL river is a filter with empty Categories.
 type ItemFilter struct {
 	// Categories selects items in any of these categories. Empty selects all
 	// (the ALL river).

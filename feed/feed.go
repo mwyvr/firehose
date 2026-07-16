@@ -41,10 +41,8 @@ const maxBodyBytes = 10 << 20 // 10 MiB
 // maxBackoff caps the exponential per-feed backoff.
 const maxBackoff = 24 * time.Hour
 
-// acceptHeader is sent on every fetch. Go's http client sends no Accept by
-// default, and CDN bot-filtering (Akamai and friends) commonly rejects
-// header-anomalous requests that browsers would never produce. Declaring the
-// feed types we actually want is correct behavior regardless.
+// acceptHeader declares the wanted feed types on every fetch; Go sends no
+// Accept by default, which CDN bot-filters commonly reject.
 const acceptHeader = "application/rss+xml, application/atom+xml, application/feed+json, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5"
 
 // Fetcher runs one fetch pass over all due feeds.
@@ -75,7 +73,7 @@ func NewFetcher(cfg *firehose.Config, feeds firehose.FeedService, items firehose
 	}
 }
 
-// newHTTPClient builds the fetch client. HTTP/2 is deliberately disabled:
+// newHTTPClient builds the fetch client. HTTP/2 is disabled:
 // CDN bot-mitigation (Akamai notably) fingerprints the h2 connection itself
 // — SETTINGS frames, frame ordering — and resets streams from non-browser
 // clients (observed as "stream error ... INTERNAL_ERROR; received from
@@ -181,4 +179,16 @@ func (f *Fetcher) Run(ctx context.Context) error {
 		}
 	}
 	return firstErr
+}
+
+// CheckConfig validates the feed-level parts of the config that only this
+// package can check (strip selectors compile). Called by `firehose check`.
+func CheckConfig(cfg *firehose.Config) error {
+	for _, fc := range cfg.Feeds {
+		if _, err := compileStrip(fc.StripSelectors); err != nil {
+			return firehose.Errorf(firehose.EINVALID,
+				"feed %s: strip_selectors: %v", fc.URL, err)
+		}
+	}
+	return nil
 }

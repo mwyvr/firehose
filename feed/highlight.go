@@ -18,12 +18,10 @@ import (
 // stylesheet — which knows about light and dark mode — owns the palette.
 var highlightFormatter = chromahtml.New(chromahtml.WithClasses(true))
 
-// Highlight applies generate-time syntax highlighting to code blocks that
-// DECLARE a language (class="language-x" / "lang-x"). It never guesses:
-// chroma's analyser is unreliable enough to be worse than nothing, and plain
-// monospace is firehose's honest voice for undeclared code — click through
-// for the publisher's presentation. Toggleable via settings.highlight.
-func Highlight(fragment string) string {
+// highlight applies syntax highlighting to code blocks that declare a
+// language (class="language-x" / "lang-x"); undeclared code stays plain.
+// Toggleable via settings.highlight.
+func highlight(fragment string) string {
 	if !strings.Contains(fragment, "language-") && !strings.Contains(fragment, "lang-") {
 		return fragment
 	}

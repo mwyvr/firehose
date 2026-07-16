@@ -3,7 +3,6 @@ package feed
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -17,9 +16,10 @@ import (
 // Probe is the result of a diagnostic single-feed fetch (`firehose test`).
 // It ignores the cache entirely: no conditional headers, nothing written.
 type Probe struct {
-	RequestURL string
-	FinalURL   string
-	Hops       []ProbeHop // redirect chain, in order
+	RequestURL     string
+	FinalURL       string
+	Hops           []ProbeHop // redirect chain, in order
+	ChainPermanent bool       // every hop 301/308: a real fetch would persist FinalURL
 
 	Status       int
 	Proto        string // negotiated protocol (expect HTTP/1.1 by design)
@@ -29,7 +29,6 @@ type Probe struct {
 	Server       string
 	BodyBytes    int
 	BodySnippet  string // first bytes of an unparseable body (block pages!)
-	ErrCode      string // classification when failing ("" on success)
 
 	FeedType    string
 	FeedVersion string
@@ -60,7 +59,6 @@ type ProbeItem struct {
 	PublishedTier string // DateFromFeed | DateRescued | DateNone
 	PublishedRaw  string // verbatim raw date string (diagnostics)
 	FullContent   bool   // content:encoded present
-	HasSummary    bool
 	Words         int
 	LeadImage     string
 }
@@ -89,39 +87,23 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 		return probeLocal(p, feedURL)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
+	fd := &firehose.Feed{URL: feedURL, UserAgent: preq.UserAgent, Headers: preq.Headers}
+	req, err := buildFeedRequest(ctx, fetch, fd)
 	if err != nil {
-		p.ErrCode = firehose.EINVALID
 		return p, firehose.Errorf(firehose.EINVALID, "bad url: %v", err)
 	}
-	ua := fetch.UserAgent
-	if preq.UserAgent != "" {
-		ua = preq.UserAgent
-	}
-	req.Header.Set("User-Agent", ua)
-	req.Header.Set("Accept", acceptHeader)
-	if fetch.AcceptLanguage != "" {
-		req.Header.Set("Accept-Language", fetch.AcceptLanguage)
-	}
-	for k, v := range preq.Headers {
-		req.Header.Set(k, v)
-	}
 
-	client := newHTTPClient(fetch)
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 {
-			return fmt.Errorf("stopped after 10 redirects")
-		}
-		p.Hops = append(p.Hops, ProbeHop{Status: req.Response.StatusCode, To: req.URL.String()})
-		p.FinalURL = req.URL.String()
-		return nil
-	}
-
-	resp, err := client.Do(req)
+	resp, trace, err := doFollow(newHTTPClient(fetch), req)
 	if err != nil {
-		p.ErrCode = classifyNetErr(err)
-		return p, firehose.Errorf(p.ErrCode, "fetch: %v", err)
+		return p, firehose.Errorf(classifyNetErr(err), "fetch: %v", err)
 	}
+	for _, h := range trace.hops {
+		p.Hops = append(p.Hops, ProbeHop(h))
+	}
+	if trace.finalURL != "" {
+		p.FinalURL = trace.finalURL
+	}
+	p.ChainPermanent = trace.allPermanent && len(trace.hops) > 0
 	defer func() { _ = resp.Body.Close() }()
 
 	p.Status = resp.StatusCode
@@ -133,20 +115,17 @@ func RunProbe(ctx context.Context, fetch firehose.FetchConfig, preq ProbeRequest
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
-		p.ErrCode = classifyNetErr(err)
-		return p, firehose.Errorf(p.ErrCode, "reading body: %v", err)
+		return p, firehose.Errorf(firehose.EINTERNAL, "reading body: %v", err)
 	}
 	p.BodyBytes = len(body)
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		p.BodySnippet = snippet(body)
-		switch resp.StatusCode {
-		case http.StatusNotFound, http.StatusGone:
-			p.ErrCode = firehose.ENOTFOUND
-		default:
-			p.ErrCode = firehose.EINTERNAL
+		code := firehose.EINTERNAL
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+			code = firehose.ENOTFOUND
 		}
-		return p, firehose.Errorf(p.ErrCode, "HTTP %d", resp.StatusCode)
+		return p, firehose.Errorf(code, "HTTP %d", resp.StatusCode)
 	}
 
 	return analyzeProbeBody(p, body, feedURL)
@@ -166,7 +145,6 @@ func snippet(body []byte) string {
 func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 	parsed, err := gofeed.NewParser().ParseString(string(body))
 	if err != nil {
-		p.ErrCode = firehose.EPARSE
 		p.BodySnippet = snippet(body)
 		return p, firehose.Errorf(firehose.EPARSE, "parse: %v", err)
 	}
@@ -201,7 +179,7 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 		if base == "" {
 			base = feedURL
 		}
-		clean, words := Sanitize(raw, base, nil)
+		clean, words := sanitize(raw, base, nil)
 		lead := firstImgSrc(clean)
 		published, tier := resolvePublished(it)
 		p.First = &ProbeItem{
@@ -212,7 +190,6 @@ func analyzeProbeBody(p *Probe, body []byte, feedURL string) (*Probe, error) {
 			PublishedTier: tier,
 			PublishedRaw:  rawDate(it),
 			FullContent:   full,
-			HasSummary:    full && it.Description != "",
 			Words:         words,
 			LeadImage:     lead,
 		}
@@ -225,24 +202,22 @@ func probeLocal(p *Probe, feedURL string) (*Probe, error) {
 	path := firehose.LocalFeedPath(feedURL)
 	fi, err := os.Stat(path)
 	if err != nil {
-		p.ErrCode = firehose.EINTERNAL
+		code := firehose.EINTERNAL
 		if errors.Is(err, os.ErrNotExist) {
-			p.ErrCode = firehose.ENOTFOUND
+			code = firehose.ENOTFOUND
 		}
-		return p, firehose.Errorf(p.ErrCode, "stat: %v", err)
+		return p, firehose.Errorf(code, "stat: %v", err)
 	}
 	p.LastModified = fi.ModTime().UTC().Format(http.TimeFormat)
 
 	fh, err := os.Open(path)
 	if err != nil {
-		p.ErrCode = firehose.EINTERNAL
-		return p, firehose.Errorf(p.ErrCode, "open: %v", err)
+		return p, firehose.Errorf(firehose.EINTERNAL, "open: %v", err)
 	}
 	defer func() { _ = fh.Close() }()
 	body, err := io.ReadAll(io.LimitReader(fh, maxBodyBytes))
 	if err != nil {
-		p.ErrCode = firehose.EINTERNAL
-		return p, firehose.Errorf(p.ErrCode, "read: %v", err)
+		return p, firehose.Errorf(firehose.EINTERNAL, "read: %v", err)
 	}
 	p.BodyBytes = len(body)
 	return analyzeProbeBody(p, body, feedURL)

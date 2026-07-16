@@ -49,10 +49,10 @@ func buildPolicy() *bluemonday.Policy {
 	return p
 }
 
-// CompileStrip compiles per-feed strip_selectors. An invalid selector is a
+// compileStrip compiles per-feed strip_selectors. An invalid selector is a
 // config error (EINVALID at the feed level; also caught by `firehose check`
 // via CheckConfig).
-func CompileStrip(selectors []string) ([]cascadia.SelectorGroup, error) {
+func compileStrip(selectors []string) ([]cascadia.SelectorGroup, error) {
 	if len(selectors) == 0 {
 		return nil, nil
 	}
@@ -67,7 +67,7 @@ func CompileStrip(selectors []string) ([]cascadia.SelectorGroup, error) {
 	return groups, nil
 }
 
-// Sanitize converts raw feed HTML into firehose's one clean voice and reports
+// sanitize converts raw feed HTML into firehose's one clean voice and reports
 // the word count of the result. One parse, then in order:
 //
 //  1. strip — remove per-feed cruft nodes (strip_selectors), pre-sanitize.
@@ -79,7 +79,7 @@ func CompileStrip(selectors []string) ([]cascadia.SelectorGroup, error) {
 // Code blocks pass through untouched apart from the allowed language-* class
 // (the never-transform-inside-pre/code rule; nothing here rewrites text
 // nodes).
-func Sanitize(raw, baseURL string, strip []cascadia.SelectorGroup) (clean string, words int) {
+func sanitize(raw, baseURL string, strip []cascadia.SelectorGroup) (clean string, words int) {
 	if strings.TrimSpace(raw) == "" {
 		return "", 0
 	}
