@@ -28,8 +28,6 @@ Deploy locally or remote using the web infrastructure you already have.
 
 Why the name? Think *drinking from a fire hose*.
 
-
-
 ## Install
 
 `firehose` is deliberately not dependent on `cgo` and thus is
@@ -82,9 +80,10 @@ server infrastructure you already have in place. See examples and more in
 
 ## Changelog
 
-- v0.2.0, 2026-07-13: Cross-feed dedupe with "also via" attribution;
-  per-feed `display_window`; health page items column (shown / cached) and
-  honest last-success (yielded items, not merely parsed).
+- v0.2.3, 2026-07-15: improve filters and cleanup
+- v0.2.2, 2026-07-14: Add per-feed source url hostname rewrite
+- v0.2.1, 2026-07-13: Fix a miss: make categories case-insensitive
+- v0.2.0, 2026-07-13: Cross-feed dedupe with "also via" attribution; per-feed `display_window`
 - v0.1.0, 2026-07-12: Eat my own dog food initial beta release.
 
 ## Future
