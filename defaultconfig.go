@@ -131,6 +131,7 @@ categories = ["example"]
 # user_agent      = "Mozilla/5.0 ..."
 # headers         = { "Accept-Language" = "en-CA" }  # extra request headers
 # exclude         = ["sponsored"]       # drop items matching these keywords
+#                     # (include/exclude match title, body, and description)
 # include         = []                  # keep only matching items
 # strip_selectors = ["div.sharedaddy"]  # remove cruft nodes post-parse
 # A local feed document (e.g. from a scraper). Can be a bare absolute path.

@@ -53,7 +53,7 @@ func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cuto
 	}
 	clean, summary, words := f.renderVoice(raw, summaryRaw, base, strip)
 
-	if skipByFilters(fd, entry.Title, clean) {
+	if skipByFilters(fd, entry.Title, clean, summary) {
 		return nil
 	}
 
@@ -158,11 +158,15 @@ func entryAuthor(entry *gofeed.Item) string {
 // whose title or text matches any keyword; a non-empty include keeps only
 // matching items. Matching is case-insensitive substring — the config answer
 // to rawdog kill-file plugins; anything fancier is exec-hook territory.
-func skipByFilters(fd *firehose.Feed, title, bodyHTML string) bool {
+// skipByFilters matches include/exclude keywords against everything the
+// item SAYS: title, body text, and the description/summary, if present.
+// description can be a separate field from the body when content:encoded
+// is present.
+func skipByFilters(fd *firehose.Feed, title, bodyHTML, summaryHTML string) bool {
 	if len(fd.Exclude) == 0 && len(fd.Include) == 0 {
 		return false
 	}
-	hay := strings.ToLower(title + " " + textContent(bodyHTML))
+	hay := strings.ToLower(title + " " + textContent(bodyHTML) + " " + textContent(summaryHTML))
 	for _, kw := range fd.Exclude {
 		if kw != "" && strings.Contains(hay, strings.ToLower(kw)) {
 			return true

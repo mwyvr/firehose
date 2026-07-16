@@ -386,17 +386,17 @@ func TestHighlightDeclaredLanguageOnly(t *testing.T) {
 
 func TestKeywordFilters(t *testing.T) {
 	fd := &firehose.Feed{Exclude: []string{"sponsored"}}
-	if !skipByFilters(fd, "A Sponsored Post", "<p>buy things</p>") {
+	if !skipByFilters(fd, "A Sponsored Post", "<p>buy things</p>", "") {
 		t.Error("exclude keyword not applied to title")
 	}
-	if skipByFilters(fd, "Real News", "<p>content</p>") {
+	if skipByFilters(fd, "Real News", "<p>content</p>", "") {
 		t.Error("clean item wrongly excluded")
 	}
 	fd2 := &firehose.Feed{Include: []string{"wildfire"}}
-	if skipByFilters(fd2, "Wildfire update", "<p>evacuation alert</p>") {
+	if skipByFilters(fd2, "Wildfire update", "<p>evacuation alert</p>", "") {
 		t.Error("include match wrongly skipped")
 	}
-	if !skipByFilters(fd2, "Sports scores", "<p>hockey</p>") {
+	if !skipByFilters(fd2, "Sports scores", "<p>hockey</p>", "") {
 		t.Error("non-matching item must be skipped when include is set")
 	}
 }
