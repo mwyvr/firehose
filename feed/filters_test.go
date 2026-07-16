@@ -59,3 +59,57 @@ func TestIncludeFilterSeesDescription(t *testing.T) {
 		t.Error("non-matching item must be dropped by include")
 	}
 }
+
+// TestURLFilters; note: linkless items cannot satisfy a URL keep-filter.
+func TestURLFilters(t *testing.T) {
+	fd := &firehose.Feed{IncludeURL: []string{"/west/"}}
+	if skipByURLFilters(fd, "https://w.example/parent_region/west/story-1.html") {
+		t.Error("matching path must be kept")
+	}
+	if !skipByURLFilters(fd, "https://w.example/parent_region/east/story-2.html") {
+		t.Error("non-matching path must be dropped")
+	}
+	if !skipByURLFilters(fd, "") {
+		t.Error("linkless item cannot satisfy include_url")
+	}
+	fd2 := &firehose.Feed{ExcludeURL: []string{"/sponsored/"}}
+	if !skipByURLFilters(fd2, "https://w.example/sponsored/buy.html") {
+		t.Error("excluded path must be dropped")
+	}
+	if skipByURLFilters(fd2, "https://w.example/news/real.html") {
+		t.Error("clean path wrongly dropped")
+	}
+	if skipByURLFilters(&firehose.Feed{}, "https://w.example/a") {
+		t.Error("no rules must be identity")
+	}
+}
+
+// TestURLFiltersThroughPipeline runs the regional-wire scenario through
+// real Run: a mixed subcategory feed keeps only items whose link path
+// carries the sub-region, and the rule travels the config overlay.
+func TestURLFiltersThroughPipeline(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
+<item><guid>a</guid><title>West story</title><link>https://w.example/parent_region/west/story-a.html</link>
+<description>TOWNSVILLE - Something happened.</description>
+<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
+<item><guid>b</guid><title>East story</title><link>https://w.example/parent_region/east/story-b.html</link>
+<description>OTHERTON - Something else happened.</description>
+<pubDate>Mon, 13 Jul 2026 09:05:00 -0700</pubDate></item>
+</channel></rss>`)
+	}))
+	defer srv.Close()
+
+	bare := &firehose.Feed{ID: 1, URL: srv.URL}
+	h := newHarness(t, []*firehose.Feed{bare})
+	h.fetcher.cfg.Feeds = []firehose.FeedConf{{URL: srv.URL, IncludeURL: []string{"/west/"}}}
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(h.upserts) != 1 || len(h.upserts[0]) != 1 {
+		t.Fatalf("want exactly the west item, got %+v", h.upserts)
+	}
+	if h.upserts[0][0].GUID != "a" {
+		t.Errorf("wrong survivor: %s", h.upserts[0][0].GUID)
+	}
+}

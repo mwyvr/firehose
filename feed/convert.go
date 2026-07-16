@@ -57,12 +57,17 @@ func (f *Fetcher) itemFromEntry(fd *firehose.Feed, entry *gofeed.Item, now, cuto
 		return nil
 	}
 
+	link := firehose.RewriteHost(entry.Link, fd.RewriteHost)
+	if skipByURLFilters(fd, link) {
+		return nil
+	}
+
 	return &firehose.Item{
 		FeedID: fd.ID,
 		GUID:   firehose.RewriteHost(guid, fd.RewriteHost),
 		Title:  entry.Title,
 		// may be empty: linkless-title rule at render
-		URL:         firehose.RewriteHost(entry.Link, fd.RewriteHost),
+		URL:         link,
 		Author:      entryAuthor(entry),
 		Published:   published.UTC(),
 		BodyHTML:    clean,
@@ -156,12 +161,8 @@ func entryAuthor(entry *gofeed.Item) string {
 
 // skipByFilters applies the per-feed keyword filters: exclude drops an item
 // whose title or text matches any keyword; a non-empty include keeps only
-// matching items. Matching is case-insensitive substring — the config answer
-// to rawdog kill-file plugins; anything fancier is exec-hook territory.
-// skipByFilters matches include/exclude keywords against everything the
-// item SAYS: title, body text, and the description/summary, if present.
-// description can be a separate field from the body when content:encoded
-// is present.
+// matching items. Matching is case-insensitive substring.
+// title, description, body content are checked
 func skipByFilters(fd *firehose.Feed, title, bodyHTML, summaryHTML string) bool {
 	if len(fd.Exclude) == 0 && len(fd.Include) == 0 {
 		return false
@@ -193,4 +194,32 @@ func CheckConfig(cfg *firehose.Config) error {
 		}
 	}
 	return nil
+}
+
+// skipByURLFilters is the URL-scoped sibling of skipByFilters, matching against
+// the item's final (post-rewrite) link — the publisher's taxonomy sometimes
+// lives in the path. keywords match path segments (an exclude of "news" would
+// drop every item under a /news/ path).
+func skipByURLFilters(fd *firehose.Feed, link string) bool {
+	if len(fd.ExcludeURL) == 0 && len(fd.IncludeURL) == 0 {
+		return false
+	}
+	l := strings.ToLower(link)
+	for _, kw := range fd.ExcludeURL {
+		if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
+			return true
+		}
+	}
+	if len(fd.IncludeURL) > 0 {
+		if link == "" {
+			return true // linkless items cannot satisfy a URL keep-filter
+		}
+		for _, kw := range fd.IncludeURL {
+			if kw != "" && strings.Contains(l, strings.ToLower(kw)) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }

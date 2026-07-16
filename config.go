@@ -104,6 +104,8 @@ type FeedConf struct {
 	StripSelectors []string          `toml:"strip_selectors"`
 	DisplayWindow  Duration          `toml:"display_window"` // per-feed override; zero inherits settings
 	RewriteHost    map[string]string `toml:"rewrite_host"`   // wrong host -> right host in item links/GUIDs
+	IncludeURL     []string          `toml:"include_url"`    // keep only items whose LINK contains one of these
+	ExcludeURL     []string          `toml:"exclude_url"`    // drop items whose LINK contains any of these
 
 	// Per-feed fetch overrides (CDN-hostile endpoints).
 	UserAgent string            `toml:"user_agent"`

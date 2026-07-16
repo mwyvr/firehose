@@ -31,6 +31,8 @@ type Feed struct {
 	ExcerptImage   string            // "", lead, none
 	Exclude        []string          // simple keyword filters (config, not hook)
 	RewriteHost    map[string]string // wrong host -> right host (config-only, overlaid per run)
+	IncludeURL     []string          // URL-scoped keep filter (config-only, overlaid per run)
+	ExcludeURL     []string          // URL-scoped drop filter (config-only, overlaid per run)
 	Include        []string          // simple keyword filters (config, not hook)
 	StripSelectors []string          // per-feed cruft removal, applied post-parse
 

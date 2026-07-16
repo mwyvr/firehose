@@ -135,6 +135,8 @@ func (f *Fetcher) Run(ctx context.Context) error {
 			fd.UserAgent = fc.UserAgent
 			fd.Headers = fc.Headers
 			fd.RewriteHost = fc.RewriteHost
+			fd.IncludeURL = fc.IncludeURL
+			fd.ExcludeURL = fc.ExcludeURL
 		}
 	}
 
