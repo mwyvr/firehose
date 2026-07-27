@@ -10,7 +10,7 @@ LINUX  := bin/firehose-linux-amd64
 PKG    := ./cmd/firehose
 DEVDIR := build/dev
 
-.PHONY: all fmt vet test build vps dev deploy tidy snapshot clean edit bump force
+.PHONY: all fmt vet test build vps dev deploy tidy snapshot clean edit bump force logs
 
 all: fmt vet test build
 
@@ -75,10 +75,16 @@ bump:
 	ssh -t $(HOST) 'systemctl restart firehose.service \
 		&& systemctl status firehose.service --no-pager -n 0'
 
-# bypass systemd, force full refresh
+# bypass systemd, force full refresh; run as the cache owner so root never
+# creates files the service cannot write
 force:
-	ssh -t $(HOST) 'sudo /usr/local/bin/firehose -force \
+	ssh -t $(HOST) 'sudo -u "$$(stat -c %U /var/lib/firehose)" /usr/local/bin/firehose -force \
 		&& systemctl status firehose.service --no-pager -n 0'
+
+# recent service logs (journald). Passwordless without sudo once your user
+# is in the systemd-journal group.
+logs:
+	ssh -t $(HOST) 'sudo journalctl -u firehose.service --no-pager -n 200'
 
 purge:
 	ssh -t $(HOST) 'sudo rm /var/lib/firehose/cache.db'

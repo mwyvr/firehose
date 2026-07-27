@@ -27,6 +27,8 @@ package feed
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -47,6 +49,7 @@ const acceptHeader = "application/rss+xml, application/atom+xml, application/fee
 
 // Fetcher runs one fetch pass over all due feeds.
 type Fetcher struct {
+	Log   io.Writer // per-feed failure log (one line per failed feed); io.Discard when unset
 	cfg   *firehose.Config
 	feeds firehose.FeedService
 	items firehose.ItemService
@@ -65,6 +68,7 @@ type Fetcher struct {
 // NewFetcher constructs a Fetcher over the given services.
 func NewFetcher(cfg *firehose.Config, feeds firehose.FeedService, items firehose.ItemService) *Fetcher {
 	return &Fetcher{
+		Log:    io.Discard,
 		cfg:    cfg,
 		feeds:  feeds,
 		items:  items,
@@ -100,6 +104,7 @@ type result struct {
 	feed  *firehose.Feed
 	items []*firehose.Item
 	upd   firehose.FeedUpdate
+	err   error // classified failure; logged, never persisted
 }
 
 // Run fetches all due feeds (those not gated by backoff), fanning out to
@@ -170,13 +175,22 @@ func (f *Fetcher) Run(ctx context.Context) error {
 	// Single-writer collector: ALL cache writes happen here.
 	var firstErr error
 	for res := range results {
+		if res.err != nil {
+			fmt.Fprintf(f.Log, "fetch failed: %s: %v\n", res.feed.URL, res.err)
+		}
 		if len(res.items) > 0 {
-			if err := f.items.UpsertItems(ctx, res.items); err != nil && firstErr == nil {
-				firstErr = err
+			if err := f.items.UpsertItems(ctx, res.items); err != nil {
+				fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
+				if firstErr == nil {
+					firstErr = err
+				}
 			}
 		}
-		if _, err := f.feeds.UpdateFeed(ctx, res.feed.ID, res.upd); err != nil && firstErr == nil {
-			firstErr = err
+		if _, err := f.feeds.UpdateFeed(ctx, res.feed.ID, res.upd); err != nil {
+			fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	return firstErr

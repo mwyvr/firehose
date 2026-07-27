@@ -27,7 +27,7 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 		if p := recover(); p != nil {
 			res.items = nil
 			res.upd = f.failure(fd, firehose.EPANIC)
-			_ = p // code-only status; message intentionally not persisted
+			res.err = firehose.Errorf(firehose.EPANIC, "panic: %v", p)
 		}
 	}()
 
@@ -40,12 +40,14 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 	req, err := f.buildRequest(ctx, fd)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINVALID)
+		res.err = err
 		return res
 	}
 
 	resp, redirect, err := doFollow(f.client, req)
 	if err != nil {
 		res.upd = f.failure(fd, classifyNetErr(err))
+		res.err = err
 		return res
 	}
 	defer drainClose(resp)
@@ -62,22 +64,26 @@ func (f *Fetcher) fetchOne(ctx context.Context, fd *firehose.Feed) (res result) 
 
 	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusGone:
 		res.upd = f.failure(fd, firehose.ENOTFOUND)
+		res.err = firehose.Errorf(firehose.ENOTFOUND, "HTTP %d", resp.StatusCode)
 		return res
 
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
 		res.upd = f.failure(fd, firehose.EINTERNAL)
+		res.err = firehose.Errorf(firehose.EINTERNAL, "HTTP %d", resp.StatusCode)
 		return res
 	}
 
 	parsed, err := gofeed.NewParser().Parse(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EPARSE)
+		res.err = err
 		return res
 	}
 
 	strip, err := compileStrip(fd.StripSelectors)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINVALID)
+		res.err = err
 		return res
 	}
 

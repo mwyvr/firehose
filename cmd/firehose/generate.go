@@ -50,6 +50,7 @@ func runGenerate(ctx context.Context, configPath string, force bool) (err error)
 		return err
 	}
 	fetcher := feed.NewFetcher(cfg, feeds, items)
+	fetcher.Log = os.Stderr
 	fetcher.Force = force
 	if err := fetcher.Run(ctx); err != nil {
 		return err

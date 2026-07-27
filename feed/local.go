@@ -22,6 +22,7 @@ func (f *Fetcher) fetchLocal(fd *firehose.Feed) (res result) {
 			code = firehose.ENOTFOUND
 		}
 		res.upd = f.failure(fd, code)
+		res.err = err
 		return res
 	}
 
@@ -35,6 +36,7 @@ func (f *Fetcher) fetchLocal(fd *firehose.Feed) (res result) {
 	fh, err := os.Open(path)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINTERNAL)
+		res.err = err
 		return res
 	}
 	defer func() { _ = fh.Close() }()
@@ -42,12 +44,14 @@ func (f *Fetcher) fetchLocal(fd *firehose.Feed) (res result) {
 	parsed, err := gofeed.NewParser().Parse(io.LimitReader(fh, maxBodyBytes))
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EPARSE)
+		res.err = err
 		return res
 	}
 
 	strip, err := compileStrip(fd.StripSelectors)
 	if err != nil {
 		res.upd = f.failure(fd, firehose.EINVALID)
+		res.err = err
 		return res
 	}
 

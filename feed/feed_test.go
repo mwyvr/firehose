@@ -658,3 +658,34 @@ func TestProbeChainPermanentVerdict(t *testing.T) {
 		t.Error("no redirects must not report ChainPermanent")
 	}
 }
+
+// TestRunLogsFetchFailures: each failed feed writes one log line naming
+// the URL and the classified error; successful feeds write nothing.
+func TestRunLogsFetchFailures(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bad" {
+			http.Error(w, "boom", http.StatusInternalServerError)
+			return
+		}
+		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>T</title></channel></rss>`)
+	}))
+	defer srv.Close()
+
+	feeds := []*firehose.Feed{
+		{ID: 1, URL: srv.URL + "/bad"},
+		{ID: 2, URL: srv.URL + "/good"},
+	}
+	h := newHarness(t, feeds)
+	var buf strings.Builder
+	h.fetcher.Log = &buf
+	if err := h.fetcher.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, srv.URL+"/bad") || !strings.Contains(out, "HTTP 500") {
+		t.Errorf("failure not logged with URL and message: %q", out)
+	}
+	if strings.Contains(out, "/good") {
+		t.Errorf("success wrongly logged: %q", out)
+	}
+}
