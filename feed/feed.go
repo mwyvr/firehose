@@ -176,18 +176,18 @@ func (f *Fetcher) Run(ctx context.Context) error {
 	var firstErr error
 	for res := range results {
 		if res.err != nil {
-			fmt.Fprintf(f.Log, "fetch failed: %s: %v\n", res.feed.URL, res.err)
+			_, _ = fmt.Fprintf(f.Log, "fetch failed: %s: %v\n", res.feed.URL, res.err)
 		}
 		if len(res.items) > 0 {
 			if err := f.items.UpsertItems(ctx, res.items); err != nil {
-				fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
+				_, _ = fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
 				if firstErr == nil {
 					firstErr = err
 				}
 			}
 		}
 		if _, err := f.feeds.UpdateFeed(ctx, res.feed.ID, res.upd); err != nil {
-			fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
+			_, _ = fmt.Fprintf(f.Log, "cache write: %s: %v\n", res.feed.URL, err)
 			if firstErr == nil {
 				firstErr = err
 			}
