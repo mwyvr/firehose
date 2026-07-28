@@ -1,11 +1,9 @@
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/mwyvr/kid)
-[![Test](https://github.com/mwyvr/kid/actions/workflows/test.yaml/badge.svg)](https://github.com/mwyvr/kid/actions/workflows/test.yaml)
-[![ci](https://github.com/mwyvr/firehose/actions/workflows/ci.yml/badge.svg)](https://github.com/mwyvr/firehose/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)![Coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/mwyvr/kid) [![Test](https://github.com/mwyvr/kid/actions/workflows/test.yaml/badge.svg)](https://github.com/mwyvr/kid/actions/workflows/test.yaml) [![ci](https://github.com/mwyvr/firehose/actions/workflows/ci.yml/badge.svg)](https://github.com/mwyvr/firehose/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) ![Coverage](https://img.shields.io/badge/coverage-92.6%25-brightgreen)
 
 # firehose
 
 <!--toc:start-->
+
 - [firehose](#firehose)
   - [Install](#install)
   - [Examples](#examples)
@@ -14,10 +12,11 @@
   - [Changelog](#changelog)
   - [Future](#future)
   - [License](#license)
+
 <!--toc:end-->
 
 `firehose` is an RSS/Atom feed aggregator and static HTML generator that renders
-your chosen feeds as a single reverse-chronological *river of news*. Inbound
+your chosen feeds as a single reverse-chronological _river of news_. Inbound
 feed content is sanitized for safety, typography is normalized, and the layout
 and styling are kept deliberately simple to favor reading on small and larger
 devices alike.
@@ -26,13 +25,12 @@ devices alike.
 a systemd timer or cron. Nothing stays resident and nothing listens on a port.
 Deploy locally or remote using the web infrastructure you already have.
 
-Why the name? Think *drinking from a fire hose*.
+Why the name? Think _drinking from a fire hose_.
 
 ## Install
 
 `firehose` is deliberately not dependent on `cgo` and thus is
-portable across operating systems and architectures. The [releases
-page](https://github.com/mwyvr/firehose/releases) contains pre-built static
+portable across operating systems and architectures. The [releases page](https://github.com/mwyvr/firehose/releases) contains pre-built static
 binaries for amd64/arm64 architecture macOS and Linux distributions.
 
 Or, build it yourself:
@@ -40,6 +38,7 @@ Or, build it yourself:
 ```
 go install github.com/mwyvr/firehose/cmd/firehose@latest
 ```
+
 ## Examples
 
 ![Example 1](docs/firehose1.png) ![Example 2](docs/firehose2.png)
@@ -91,7 +90,7 @@ server infrastructure you already have in place. See examples and more in
 Not a lot planned. Possibly:
 
 - OPML import (`firehose export` already writes OPML)
-- *Maybe* user-definable templates and CSS overrides.
+- _Maybe_ user-definable templates and CSS overrides.
 
 ## License
 
