@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mwyvr/firehose"
 )
@@ -17,11 +18,11 @@ import (
 // overlay like every other per-feed setting.
 func TestRewriteHostThroughPipeline(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Local TV</title>
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Local TV</title>
 <item><guid>https://www.network.example/news/story-1/</guid><title>Local Story</title>
 <link>https://www.network.example/news/story-1/</link>
-<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
-</channel></rss>`)
+<pubDate>%s</pubDate></item>
+</channel></rss>`, zonedAgo(time.Hour))
 	}))
 	defer srv.Close()
 

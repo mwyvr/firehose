@@ -2,6 +2,7 @@ package feed
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,15 +11,16 @@ import (
 	"github.com/mwyvr/firehose"
 )
 
-const localTestFeed = `<?xml version="1.0"?><rss version="2.0"><channel>
+const localTestFeedTemplate = `<?xml version="1.0"?><rss version="2.0"><channel>
 <title>Scraped Site</title>
 <item><guid>s-1</guid><title>Scraped One</title><link>https://site.example/one</link>
-<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate><description>hello</description></item>
+<pubDate>%s</pubDate><description>hello</description></item>
 </channel></rss>`
 
 // TestLocalFeedLifecycle runs a file:// feed through the real Run pipeline:
 func TestLocalFeedLifecycle(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "site.xml")
+	localTestFeed := fmt.Sprintf(localTestFeedTemplate, zonedAgo(time.Hour))
 	if err := os.WriteFile(path, []byte(localTestFeed), 0o644); err != nil {
 		t.Fatal(err)
 	}

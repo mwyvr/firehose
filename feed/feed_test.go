@@ -23,10 +23,29 @@ const rssTemplate = `<?xml version="1.0" encoding="UTF-8"?>
   <title>First item</title>
   <link>%s/posts/one</link>
   <guid>guid-1</guid>
-  <pubDate>Mon, 06 Jul 2026 10:00:00 GMT</pubDate>
+  <pubDate>%s</pubDate>
   <description>&lt;p&gt;Hello &lt;a href="/rel"&gt;relative&lt;/a&gt; world&lt;/p&gt;</description>
 </item>
 </channel></rss>`
+
+// Fixture dates are relative to now: a hardcoded date eventually falls past
+// cache_retention and every pipeline test starts storing nothing.
+
+// zonedAgo renders a pubDate with an explicit offset (gofeed parses it).
+func zonedAgo(ago time.Duration) string {
+	return time.Now().Add(-ago).Format(time.RFC1123Z)
+}
+
+// looseAgo renders a zoneless pubDate in the rescue layout, in UTC so the
+// parser's UTC assumption round-trips exactly.
+func looseAgo(ago time.Duration) string {
+	return time.Now().UTC().Add(-ago).Format("Mon, 2 January 2006 15:04:05")
+}
+
+// rssBody fills the template with a fresh date.
+func rssBody(base string) string {
+	return fmt.Sprintf(rssTemplate, base, zonedAgo(time.Hour))
+}
 
 func testConfig() *firehose.Config {
 	return &firehose.Config{
@@ -88,7 +107,7 @@ func (h *harness) lastUpdate(t *testing.T) firehose.FeedUpdate {
 func TestFetchParsesAndSanitizes(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"v1"`)
-		_, _ = fmt.Fprintf(w, rssTemplate, "http://"+r.Host)
+		_, _ = fmt.Fprint(w, rssBody("http://"+r.Host))
 	}))
 	defer srv.Close()
 
@@ -171,7 +190,7 @@ func TestPermanentRedirectPersisted(t *testing.T) {
 		http.Redirect(w, r, srv.URL+"/new", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprintf(w, rssTemplate, srv.URL)
+		_, _ = fmt.Fprint(w, rssBody(srv.URL))
 	})
 
 	h := newHarness(t, []*firehose.Feed{{ID: 1, URL: srv.URL + "/old"}})
@@ -192,7 +211,7 @@ func TestTemporaryRedirectNotPersisted(t *testing.T) {
 		http.Redirect(w, r, srv.URL+"/new", http.StatusFound) // 302
 	})
 	mux.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprintf(w, rssTemplate, srv.URL)
+		_, _ = fmt.Fprint(w, rssBody(srv.URL))
 	})
 
 	h := newHarness(t, []*firehose.Feed{{ID: 1, URL: srv.URL + "/old"}})
@@ -413,7 +432,7 @@ func TestProbeSuccessWithRedirect(t *testing.T) {
 	})
 	mux.HandleFunc("/feed", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"p1"`)
-		_, _ = fmt.Fprintf(w, rssTemplate, srv.URL)
+		_, _ = fmt.Fprint(w, rssBody(srv.URL))
 	})
 
 	p, err := RunProbe(context.Background(), firehose.DefaultFetchConfig(), ProbeRequest{URL: srv.URL + "/old"})
@@ -519,7 +538,7 @@ func TestAcceptLanguageSent(t *testing.T) {
 	var gotAL string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAL = r.Header.Get("Accept-Language")
-		_, _ = fmt.Fprintf(w, rssTemplate, "http://"+r.Host)
+		_, _ = fmt.Fprint(w, rssBody("http://"+r.Host))
 	}))
 	defer srv.Close()
 	h := newHarness(t, []*firehose.Feed{{ID: 1, URL: srv.URL}})

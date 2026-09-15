@@ -17,20 +17,20 @@ import (
 // haystack previously excluded. include keywords must match it.
 func TestIncludeFilterSeesDescription(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, `<?xml version="1.0"?>
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0"?>
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Wire</title>
 <item><guid>a</guid><title>Ferry expansion approved</title><link>https://w.example/a</link>
 <description>VICTORIA — The province approved new vessels.</description>
 <content:encoded><![CDATA[<p>The province approved new vessels for coastal routes, officials said.</p>]]></content:encoded>
-<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>b</guid><title>Harvest outlook improves</title><link>https://w.example/b</link>
 <description>SASKATOON — Crop conditions improved this week.</description>
 <content:encoded><![CDATA[<p>Crop conditions improved across the region this week.</p>]]></content:encoded>
-<pubDate>Mon, 13 Jul 2026 09:05:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>c</guid><title>Small town waterline fixed</title><link>https://w.example/c</link>
 <description>EXAMPLEVILLE, B.C. — Repairs completed ahead of schedule.</description>
-<pubDate>Mon, 13 Jul 2026 09:10:00 -0700</pubDate></item>
-</channel></rss>`)
+<pubDate>%s</pubDate></item>
+</channel></rss>`, zonedAgo(1*time.Hour), zonedAgo(2*time.Hour), zonedAgo(3*time.Hour))
 	}))
 	defer srv.Close()
 
@@ -90,14 +90,14 @@ func TestURLFilters(t *testing.T) {
 // carries the sub-region, and the rule travels the config overlay.
 func TestURLFiltersThroughPipeline(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
 <item><guid>a</guid><title>West story</title><link>https://w.example/parent_region/west/story-a.html</link>
 <description>TOWNSVILLE - Something happened.</description>
-<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>b</guid><title>East story</title><link>https://w.example/parent_region/east/story-b.html</link>
 <description>OTHERTON - Something else happened.</description>
-<pubDate>Mon, 13 Jul 2026 09:05:00 -0700</pubDate></item>
-</channel></rss>`)
+<pubDate>%s</pubDate></item>
+</channel></rss>`, zonedAgo(1*time.Hour), zonedAgo(2*time.Hour))
 	}))
 	defer srv.Close()
 
@@ -122,20 +122,20 @@ func TestURLFiltersThroughPipeline(t *testing.T) {
 // it; excludes still veto regardless.
 func TestIncludeFamiliesComposeAsOR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Wire</title>
 <item><guid>text-only</guid><title>Nurses talks begin</title><link>https://w.example/national/nurses-talks-begin.html</link>
 <description>WESTVILLE - Talks in West Province began Monday.</description>
-<pubDate>Mon, 13 Jul 2026 09:00:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>url-only</guid><title>Driver sentenced</title><link>https://w.example/parent_region/west/driver-sentenced.html</link>
 <description>SMALLTOWN - A driver was sentenced.</description>
-<pubDate>Mon, 13 Jul 2026 09:01:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>neither</guid><title>Harvest outlook</title><link>https://w.example/parent_region/east/harvest.html</link>
 <description>EASTBURG - Crops improved.</description>
-<pubDate>Mon, 13 Jul 2026 09:02:00 -0700</pubDate></item>
+<pubDate>%s</pubDate></item>
 <item><guid>vetoed</guid><title>Sponsored: West Province deals</title><link>https://w.example/parent_region/west/deals.html</link>
 <description>WESTVILLE - Buy things.</description>
-<pubDate>Mon, 13 Jul 2026 09:03:00 -0700</pubDate></item>
-</channel></rss>`)
+<pubDate>%s</pubDate></item>
+</channel></rss>`, zonedAgo(1*time.Hour), zonedAgo(2*time.Hour), zonedAgo(3*time.Hour), zonedAgo(4*time.Hour))
 	}))
 	defer srv.Close()
 
@@ -177,29 +177,34 @@ func TestIncludeFamiliesComposeAsOR(t *testing.T) {
 // TestFeedTimezoneThroughPipeline: a zoneless rescued date is interpreted
 // in the feed's configured timezone and stored as the equivalent UTC.
 func TestFeedTimezoneThroughPipeline(t *testing.T) {
-	if _, err := time.LoadLocation("America/Edmonton"); err != nil {
+	edm, err := time.LoadLocation("America/Edmonton")
+	if err != nil {
 		t.Skipf("no tzdata: %v", err)
 	}
+	// One instant drives both the zoneless fixture stamp and the expectation.
+	local := time.Now().In(edm).Add(-2 * time.Hour).Truncate(time.Second)
+	stamp := local.Format("Mon, 2 January 2006 15:04:05")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Town</title>
+		_, _ = fmt.Fprintf(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Town</title>
 <item><guid>a</guid><title>Notice</title><link>https://t.example/a</link>
 <description>A notice.</description>
-<pubDate>Mon, 13 July 2026 12:00:00</pubDate></item>
-</channel></rss>`)
+<pubDate>%s</pubDate></item>
+</channel></rss>`, stamp)
 	}))
 	defer srv.Close()
 
 	bare := &firehose.Feed{ID: 1, URL: srv.URL}
 	h := newHarness(t, []*firehose.Feed{bare})
 	h.fetcher.cfg.Feeds = []firehose.FeedConf{{URL: srv.URL, Timezone: "America/Edmonton"}}
-	if err := h.fetcher.Run(context.Background()); err != nil {
-		t.Fatalf("run: %v", err)
+	if runErr := h.fetcher.Run(context.Background()); runErr != nil {
+		t.Fatalf("run: %v", runErr)
 	}
 	if len(h.upserts) != 1 || len(h.upserts[0]) != 1 {
 		t.Fatalf("want one item, got %+v", h.upserts)
 	}
 	got := h.upserts[0][0].Published.UTC()
-	want := time.Date(2026, 7, 13, 18, 0, 0, 0, time.UTC) // noon MDT
+	want := time.Date(local.Year(), local.Month(), local.Day(),
+		local.Hour(), local.Minute(), local.Second(), 0, edm).UTC()
 	if !got.Equal(want) {
 		t.Errorf("published = %v, want %v", got, want)
 	}
