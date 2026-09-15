@@ -8,7 +8,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.3
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/mmcdole/gofeed v1.4.0
-	github.com/mwyvr/kid v1.3.1
+	github.com/mwyvr/kid/v2 v2.1.0
 	golang.org/x/net v0.56.0
 	modernc.org/sqlite v1.34.1
 )

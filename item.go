@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/mwyvr/kid"
+	"github.com/mwyvr/kid/v2"
 )
 
 // Item is a single feed entry, already sanitized (and, where the feed declared

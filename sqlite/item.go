@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/mwyvr/firehose"
-	"github.com/mwyvr/kid"
+	"github.com/mwyvr/kid/v2"
 )
 
 // ItemService is the SQLite-backed firehose.ItemService.
@@ -130,7 +130,7 @@ func (s *ItemService) UpsertItems(ctx context.Context, items []*firehose.Item) e
 			err := findStmt.QueryRowContext(ctx, it.FeedID, it.GUID).Scan(&existing)
 			switch err {
 			case nil:
-				parsed, perr := kid.FromString(existing)
+				parsed, perr := kid.Parse(existing)
 				if perr != nil {
 					return firehose.Errorf(firehose.EINTERNAL,
 						"sqlite: bad stored id %q: %v", existing, perr)
@@ -148,7 +148,8 @@ func (s *ItemService) UpsertItems(ctx context.Context, items []*firehose.Item) e
 			fullContent = 1
 		}
 
-		if _, err := upStmt.ExecContext(ctx,
+		if _, err := upStmt.ExecContext(
+			ctx,
 			id.String(), it.FeedID, it.GUID, it.Title, it.URL, it.Author,
 			it.Published.UTC(), it.BodyHTML, it.SummaryHTML, it.LeadImage,
 			fullContent, it.WordCount, it.FetchedAt.UTC(),
@@ -195,7 +196,7 @@ func (s *ItemService) scanItem(rows *sql.Rows) (*firehose.Item, []string, error)
 	); err != nil {
 		return nil, nil, firehose.Errorf(firehose.EINTERNAL, "sqlite: scan item: %v", err)
 	}
-	id, err := kid.FromString(idStr)
+	id, err := kid.Parse(idStr)
 	if err != nil {
 		return nil, nil, firehose.Errorf(firehose.EINTERNAL, "sqlite: bad item id %q: %v", idStr, err)
 	}

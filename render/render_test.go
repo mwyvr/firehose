@@ -10,7 +10,7 @@ import (
 
 	"github.com/mwyvr/firehose"
 	"github.com/mwyvr/firehose/mock"
-	"github.com/mwyvr/kid"
+	"github.com/mwyvr/kid/v2"
 )
 
 func testConfig(t *testing.T) *firehose.Config {
