@@ -1,0 +1,30 @@
+## v0.2.5:
+
+fix: relative fixture dates — pipeline tests no longer expire
+
+Fixtures carried hardcoded July 2026 pubDates. Past 30 days of
+cache_retention every item is dropped at the retention gate, so all
+eight pipeline tests began asserting against empty upserts. Not a kid v2
+problem: no sqlite test failed, and kid is used only there.
+
+Fixtures now derive dates from time.Now() via two helpers in
+feed_test.go: zonedAgo (RFC1123Z, explicit offset) and looseAgo
+(zoneless rescue layout, UTC). Relative offsets preserve the original
+item ordering where tests depend on it.
+
+modified: feed/feed_test.go    — zonedAgo/looseAgo/rssBody helpers;
+                                 rssTemplate takes the date; call sites
+modified: feed/dates_test.go   — govstack end-to-end uses a fresh
+                                 rescued date and derives its expected
+                                 value from the same string
+modified: feed/filters_test.go — relative stamps; the timezone test
+                                 derives fixture and expectation from
+                                 one instant, so the offset assertion
+                                 stays real (and DST-correct) year-round
+modified: feed/local_test.go   — template filled at use
+modified: feed/rewrite_test.go — relative stamp
+
+Deliberately unchanged: the 2022 and 2020 fixtures (they exist to be
+dropped by retention) and the parse-tier tables (no storage, no clock).
+
+Applies on top of your local kid v2 bump; test files only.
